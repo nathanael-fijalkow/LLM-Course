@@ -1,0 +1,656 @@
+---
+title: "Large Language Models"
+subtitle: "Part 5: Post-training"
+author: "Nathanaël Fijalkow, <br>CNRS, LaBRI, University of Bordeaux,<br>NukkAI, Paris"
+format:
+  revealjs:
+    theme: moon
+    slide-number: true
+    chalkboard: true
+    smaller: true
+    css: custom.css
+    scrollable: true
+    code-line-numbers: true
+    highlight-style: github
+    html-math-method: katex
+execute:
+  eval: true
+  echo: false
+---
+
+# Outline
+
+0. Lifecycle of a Language Model
+1. What is alignment?
+2. Supervised Fine-Tuning (SFT)
+3. RLHF and reward modeling
+4. Direct Preference Optimization (DPO)
+5. KTO (Kahneman-Tversky Optimization)
+6. GRPO and reasoning models
+7. Parameter-Efficient Fine-Tuning (LoRA)
+
+```{python}
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import matplotlib.pyplot as plt
+import numpy as np
+
+from transformers import AutoTokenizer
+
+```
+
+# 0. Lifecycle of a Language Model
+<!-- type: content -->
+
+Three main phases:
+
+| Phase | Key idea |
+|---|---|
+| Pre-training | Next-token prediction on massive corpora |
+| Post-training | Alignment with human preferences |
+| Inference | Autoregressive generation, token by token |
+
+## Pre-training
+<!-- type: content -->
+
+Train on a massive text corpus (hundreds of billions to trillions of tokens) using **next-token prediction**.
+
+- The model learns language structure, world knowledge, and reasoning patterns.
+- Requires significant compute (hundreds to thousands of GPU-days).
+- Produces a **foundational model**: a good text predictor, not yet a useful assistant.
+
+## Some statistics on model size
+<!-- type: content -->
+
+  Model                    Year   Parameters   Training tokens
+  ------------------------ ------ ------------ ----------------
+  GPT-2                    2019   1.5B         ~10B
+  GPT-3                    2020   175B         300B
+  Llama 3 (largest)        2024   405B         15T
+  DeepSeek-V3              2024   671B (MoE)   14T
+  Llama 4 Maverick         2025   400B (MoE)   22T
+
+## Post-training
+<!-- type: content -->
+
+Turn the foundational model into a useful assistant:
+
+- **Supervised fine-tuning (SFT)**: train on curated instruction-response pairs.
+- **Preference optimization (RLHF, DPO, …)**: use human preferences to shape outputs.
+
+Post-training is far cheaper than pre-training.
+
+# 1. What is Alignment?
+<!-- type: content -->
+
+A **foundational model** completes text. Ask it *"What is the capital of France?"* and it might reply:
+
+> *"…is a question often posed on French geography quizzes. The answer, of course, depends on the era…"*
+
+It is not trying to help you. It is predicting the most likely continuation of text it has seen before.
+
+## The alignment problem
+<!-- type: content -->
+
+Three failure modes of a foundational model:
+
+| Failure | Example |
+|---------|---------|
+| **Unhelpful** | Continues a question instead of answering it |
+| **Harmful** | Produces instructions for dangerous activities if prompted |
+| **Dishonest** | Confidently generates false information ("hallucination") |
+
+. . .
+
+**Alignment** means training the model to be **Helpful, Harmless, and Honest** (Anthropic's "3 H's").
+
+## Chat templates
+<!-- type: content -->
+
+Aligned models are fine-tuned to understand a **structured conversation format**. Every provider defines one:
+
+```
+<|im_start|>system
+You are a helpful assistant.
+<|im_end|>
+<|im_start|>user
+What is the capital of France?
+<|im_end|>
+<|im_start|>assistant
+The capital of France is Paris.
+<|im_end|>
+```
+
+. . .
+
+This is the **ChatML** format (used by Qwen, SmolLM, ...). 
+
+Each model has its own chat template, for instance LLaMA uses `[INST]...[/INST]`. 
+The format matters: sending input in the wrong template gives garbage outputs.
+
+## Applying a chat template in code
+<!-- type: content -->
+
+```{python}
+#| echo: true
+tokenizer = AutoTokenizer.from_pretrained("HuggingFaceTB/SmolLM2-135M-Instruct")
+
+messages = [
+    {"role": "system", "content": "You are a helpful assistant."},
+    {"role": "user",   "content": "What is the capital of France?"},
+]
+
+prompt = tokenizer.apply_chat_template(
+    messages,
+    tokenize=False,         # return a string, not token ids
+    add_generation_prompt=True   # add the opening <|im_start|>assistant token
+)
+print(prompt)
+```
+
+The model then **continues** from the assistant marker.
+
+# 2. Supervised Fine-Tuning (SFT)
+<!-- type: content -->
+
+Training on high-quality, curated (prompt, response) pairs.
+
+The model learns: *given this conversation, predict these response tokens*.
+
+Key insights:
+
+- **Quality > quantity**: 1,000 high-quality examples can outperform 50,000 mediocre ones.
+- **Loss masking**: compute cross-entropy only on response tokens: prompt tokens are ignored.
+- **Limitation**: the model learns to mimic, it doesn't learn to rank or compare answers.
+
+## Loss masking
+<!-- type: content -->
+
+```{python}
+#| echo: true
+tokenizer = AutoTokenizer.from_pretrained("gpt2")
+tokenizer.pad_token = tokenizer.eos_token
+
+prompt   = "What is the capital of France?"
+response = "The capital of France is Paris."
+
+prompt_ids   = tokenizer.encode(prompt)
+response_ids = tokenizer.encode(" " + response)
+full_ids     = prompt_ids + response_ids
+
+# -100 tells PyTorch to ignore this position in the cross-entropy loss
+labels = [-100] * len(prompt_ids) + response_ids
+
+for i, (tok_id, label) in enumerate(zip(full_ids, labels)):
+    tok    = tokenizer.decode([tok_id])
+    status = "MASKED" if label == -100 else "TRAIN"
+    print(f"  [{i:2d}] {tok!r:20s} {status}")
+```
+
+The gradient flows **only through response tokens**. The model is rewarded for producing the right response, not for predicting the prompt back.
+
+## Why cross-entropy?
+<!-- type: content -->
+
+**Cross-entropy = maximum likelihood estimation.** For one token:
+$$\mathcal{L}_{CE} = -\log p_\theta(y_t \mid y_{<t}, x) = -\log \frac{e^{\text{logit}_{y_t}}}{\sum_{v} e^{\text{logit}_v}}$$
+
+- Penalises **only the probability mass on the correct token**.
+- Minimising CE over a dataset = maximising the likelihood of the training data under the model.
+- Equivalently, minimising the KL divergence from the empirical data distribution to the model's distribution.
+
+. . .
+
+**In practice**, SFT loss = cross-entropy **summed over response tokens only** (prompt tokens are masked with `ignore_index=-100` in PyTorch).
+
+## What SFT cannot do
+<!-- type: content -->
+
+SFT teaches the model to imitate good responses. But:
+
+- **It cannot improve beyond the quality of the training data.** If your demonstrators write mediocre answers, the model learns mediocrity.
+- **It cannot express preferences.** The model cannot learn "this answer is better than that one", only "this is the right answer."
+- **It cannot safely generalize to harmful requests.** The model never sees bad examples with negative feedback.
+
+. . .
+
+> SFT alone is insufficient for safe, high-quality models. We need to teach the model to *prefer* good outputs over bad ones.
+
+# 3. RLHF: Reinforcement Learning from Human Feedback
+<!-- type: content -->
+
+## Why not just more SFT?
+
+Human preferences are hard to express as single demonstrations:
+
+- *"Explain quantum mechanics to a 5-year-old"*: is a short answer or long answer better?
+- *"Write a poem about sadness"*: there is no unique right answer.
+
+It is easier for humans to **compare** two answers than to write the ideal one.
+
+## Collecting human preferences
+<!-- type: content -->
+
+The pipeline starts with collecting *pairwise comparisons*:
+
+1. Generate **two different responses** for the same prompt.
+2. Ask human annotators: **which response is better?**
+3. Record triples: (prompt, chosen response $y_w$, rejected response $y_l$).
+
+This produces a preference dataset. 
+
+. . . 
+
+Typical scale: tens to hundreds of thousands of comparisons.
+
+## The reward model
+<!-- type: content -->
+
+A **reward model** $r_\phi(x, y)$ is trained to score (prompt, response) pairs so that:
+
+$$r_\phi(x, y_w) > r_\phi(x, y_l)$$
+
+for every (prompt, chosen, rejected) triple in the training data.
+
+. . .
+
+In the Bradley-Terry Model, the probability that $y_1$ is preferred over $y_2$:
+$$P(y_1 \succ y_2 \mid x) = \sigma(r(x, y_1) - r(x, y_2))$$
+
+Training loss (maximize log-likelihood):
+
+$$\mathcal{L}_{\text{RM}} = -\log\sigma(r_\phi(x, y_w) - r_\phi(x, y_l))$$
+
+## Reward model code
+<!-- type: content -->
+
+```{python}
+#| echo: true
+class SimpleRewardModel(nn.Module):
+    def __init__(self, input_dim):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(input_dim, 128), nn.ReLU(),
+            nn.Linear(128, 64), nn.ReLU(),
+            nn.Linear(64, 1)
+        )
+    def forward(self, x):
+        return self.net(x).squeeze(-1)
+
+def bt_loss(rm, x_chosen, x_rejected):
+    return -F.logsigmoid(rm(x_chosen) - rm(x_rejected)).mean()
+
+rm = SimpleRewardModel(32)
+opt = torch.optim.Adam(rm.parameters(), lr=1e-3)
+x_w = torch.randn(500, 32) + 0.5   # "good" responses
+x_l = torch.randn(500, 32) - 0.5   # "bad" responses
+
+losses = []
+for _ in range(200):
+    loss = bt_loss(rm, x_w, x_l)
+    opt.zero_grad(); loss.backward(); opt.step()
+    losses.append(loss.item())
+
+with torch.no_grad():
+    acc = (rm(x_w[:50]) > rm(x_l[:50])).float().mean()
+print(f"Ranking accuracy: {acc:.1%}")
+```
+
+## From reward model to RL
+<!-- type: content -->
+
+With a reward model $r_\phi(x, y)$ in hand, we want to fine-tune the LLM to generate high-reward outputs.
+
+<br/>
+
+This is a **reinforcement learning** problem:
+
+| RL concept | In this context |
+|---|---|
+| **Policy** $\pi_\theta$ | The language model being trained |
+| **State** | Prompt + tokens generated so far |
+| **Action** | Sampling the next token |
+| **Reward** | $r_\phi(x, y)$, given at the end of the full response (sparse) |
+
+The model generates a complete response (a sequence of actions), then receives a single reward at the end.
+
+## The reference model
+<!-- type: content -->
+
+Maximizing reward alone is dangerous: the model learns to **exploit** the reward model.
+
+<br/>
+
+**Solution**: maintain a **reference model** $\pi_\text{ref}$, a frozen copy of the SFT model, and add a penalty for diverging from it.
+
+- The reference model is **never updated** during RL training.
+- It acts as an anchor ensuring the policy stays close to the original SFT behaviour.
+- Without it, the model finds adversarial outputs that score high on $r_\phi$ but are nonsense ("reward hacking").
+
+## PPO: the RL step
+<!-- type: content -->
+
+After training the reward model, use **PPO** (Proximal Policy Optimization) to fine-tune the LLM:
+
+> Maximize $\mathbb{E}_{y \sim \pi_\theta(\cdot|x)}\bigl[r_\phi(x, y)\bigr]$, while staying close to the reference model.
+
+The **KL penalty** prevents the model from drifting too far:
+$$\text{objective} = r_\phi(x, y) - \beta \cdot \text{KL}[\pi_\theta(\cdot|x) \| \pi_\text{ref}(\cdot|x)]$$
+
+## KL divergence
+<!-- type: content -->
+
+For two probability distributions $P$ and $Q$ over the same space:
+$$\text{KL}(P \| Q) = \mathbb{E}_{x \sim P}\!\left[\log \frac{P(x)}{Q(x)}\right] = \sum_x P(x) \log \frac{P(x)}{Q(x)}$$
+
+Key properties:
+
+- **Non-negative**: $\text{KL}(P \| Q) \geq 0$, with equality iff $P = Q$.
+- **Asymmetric**: $\text{KL}(P \| Q) \neq \text{KL}(Q \| P)$ in general.
+- Measures how much "surprise" you get observing samples from $P$ when you expected $Q$.
+
+. . .
+
+Here, $\text{KL}[\pi_\theta(\cdot|x) \| \pi_\text{ref}(\cdot|x)]$ measures how far the trained policy has drifted from the reference model. Keeping it small prevents reward hacking.
+
+## The KL penalty in practice
+<!-- type: content -->
+
+The full KL divergence $\text{KL}[\pi_\theta(\cdot|x) \| \pi_\text{ref}(\cdot|x)]$ sums over **all possible responses**: intractable for a large vocabulary.
+
+**Token-level approximation.** Since both models are autoregressive:
+$$\pi(y \mid x) = \prod_{t=1}^T \pi(y_t \mid y_{<t}, x)$$
+
+the log-ratio of the policy to the reference **along a sampled response** $y = (y_1, \ldots, y_T)$ factorises into a sum:
+
+$$\log \frac{\pi_\theta(y \mid x)}{\pi_\text{ref}(y \mid x)} = \sum_{t=1}^{T} \log \frac{\pi_\theta(y_t \mid y_{<t}, x)}{\pi_\text{ref}(y_t \mid y_{<t}, x)}$$
+
+This is a **per-token difference of log-probabilities**: cheap to compute by running both models on the same sequence.
+
+## Issues with RLHF
+<!-- type: content -->
+
+PPO requires **four models** in memory simultaneously:
+
+1. **Policy**: the LLM being trained
+2. **Value model**: estimates expected future reward (same size as policy!)
+3. **Reference model**: frozen copy of the original SFT model
+4. **Reward model**: evaluates quality
+
+For a 70B model, this is ~4 × 140 GB ≈ 560 GB of GPU memory. Extremely expensive.
+
+## Reward hacking
+<!-- type: content -->
+
+A fundamental problem: the model learns to **maximize the reward model score**, not actual quality. Known failure modes:
+
+| Failure mode | What happens |
+|-------------|-------------|
+| **Length hacking** | Generates very long responses: reward models often prefer verbose text |
+| **Sycophancy** | Agrees with the user rather than being correct |
+| **Formatting tricks** | Adds bullet points, headers, etc. even when unhelpful |
+| **Adversarial gibberish** | Rare tokens that trick the reward model |
+
+. . .
+
+> The reward model is an approximation of human preferences. Optimizing it too hard breaks the approximation.
+
+## RLAIF: AI feedback instead of human feedback
+<!-- type: content -->
+
+**Constitutional AI** (Anthropic, 2022): replace human labelers with another AI.
+
+1. Write a **constitution**: a list of principles (e.g. *"Do not assist with harmful activities"*).
+2. Use a large model to generate critiques and revisions of responses according to the constitution.
+3. Train a reward model on **AI-labeled** preferences.
+4. RL as usual.
+
+Benefits: scales to millions of comparisons; consistent; cheap.
+
+Used in Claude models. The "AI" feedback can be from a much larger, more capable model.
+
+# 4. Direct Preference Optimization (DPO)
+<!-- type: content -->
+
+**Key insight**: the optimal policy under RLHF can be derived in closed form: we don't need to train a reward model separately!
+
+## The DPO insight
+
+The KL-penalised objective has a closed-form optimal policy:
+$$\pi^*(y \mid x) = \frac{\pi_\text{ref}(y \mid x)\, e^{r(x,y)/\beta}}{Z(x)}, \qquad Z(x) = \sum_y \pi_\text{ref}(y \mid x)\, e^{r(x,y)/\beta}$$
+
+$Z(x)$ is the **partition function**: the normalisation constant (summing over all completions $y$) that makes $\pi^*$ a valid probability distribution. It depends only on the prompt $x$, not on any specific completion.
+
+Inverting this gives the reward in terms of the policy:
+$$r^*(x, y) = \beta \log \frac{\pi^*(y|x)}{\pi_\text{ref}(y|x)} + \beta \log Z(x)$$
+
+Plugging this into the Bradley-Terry loss, $Z(x)$ **cancels** (same prompt for $y_w$ and $y_l$), eliminating the reward model entirely.
+
+## The DPO loss
+<!-- type: content -->
+
+$$\mathcal{L}_{\text{DPO}} = -\log\sigma\!\left(\beta \left[\log\frac{\pi_\theta(y_w|x)}{\pi_{\text{ref}}(y_w|x)} - \log\frac{\pi_\theta(y_l|x)}{\pi_{\text{ref}}(y_l|x)}\right]\right)$$
+
+Intuitively: increase the probability of the chosen response *relative to the reference*, and decrease the probability of the rejected response *relative to the reference*.
+
+- $\beta$ controls how far $\pi_\theta$ can deviate from $\pi_\text{ref}$. High $\beta$ = stay close to SFT.
+- Only **two models** needed: policy and reference. No reward model, no value model.
+
+# 5. KTO (Kahneman-Tversky Optimization)
+<!-- type: content -->
+
+In practice, pairwise comparisons are expensive to collect. **KTO** works with simple **good / bad** labels: no pairing required.
+
+Inspired by *Prospect Theory* (Kahneman & Tversky):
+
+- **Loss aversion**: humans feel losses more strongly than equivalent gains.
+- **Diminishing sensitivity**: going from \$10→\$20 feels larger than \$110→\$120.
+
+## KTO loss
+<!-- type: content -->
+
+The KTO objective compares each completion to a *reference level* $z_\text{ref}$ (the average log-ratio):
+
+$$\begin{array}{lll}
+\mathcal{L}_{\text{KTO}} & = & \lambda_D \cdot \mathbb{E}_{\text{good}} \left[1 - \sigma\!\left(\beta(\log\frac{\pi_\theta(y|x)}{\pi_\text{ref}(y|x)} - z_\text{ref})\right)\right] \\[0.5em]
+& + & \lambda_U \cdot \mathbb{E}_{\text{bad}} \left[1 - \sigma\!\left(-\beta(\log\frac{\pi_\theta(y|x)}{\pi_\text{ref}(y|x)} - z_\text{ref})\right)\right]
+\end{array}$$
+
+Good outputs are rewarded when above average; bad outputs are penalized when above average.
+
+. . .
+
+**How is $z_\text{ref}$ computed?** It is estimated per mini-batch as the mean log-ratio over *other* examples in the batch:
+$$z_\text{ref} = \mathbb{E}_{(x',y') \sim \mathcal{D}}\!\left[\log \frac{\pi_\theta(y' \mid x')}{\pi_\text{ref}(y' \mid x')}\right]$$
+
+This measures the *average* policy deviation from the reference model.
+
+# 6. GRPO and Reasoning Models
+<!-- type: content -->
+
+**Chain-of-Thought (CoT)**: asking the model to reason step-by-step before answering significantly improves performance on hard tasks.
+
+For tasks with **verifiable answers** (math, code, logic puzzles), we can evaluate the final answer automatically: no human or reward model needed.
+
+> If the answer is objectively right or wrong, we have a perfect reward signal.
+
+## Reinforcement learning with verifiable rewards
+<!-- type: content -->
+
+Two types of rewards:
+
+| Type | Source | Example |
+|------|--------|---------|
+| **Correctness** | Automated verifier | Is the final answer correct? |
+| **Format** | Rule-based check | Is the answer boxed? Is the reasoning well-structured? |
+
+. . .
+
+> **The reasoning process itself is never evaluated**, only the final answer.
+> The model is entirely free to reason in any way it finds useful, even in ways that are not interpretable to humans.
+
+## DeepSeek R1 (2025)
+
+DeepSeek trained a reasoning model using RL with verifiable rewards on math and code problems. Emergent behaviors observed:
+
+- **Self-reflection**: the model spontaneously backtracks ("Wait, that's wrong...")
+- **Longer chains of thought** on harder problems
+- **"Aha moments"**: the model discovers a better strategy mid-reasoning
+
+. . .
+
+<br/>
+
+In **R1-Zero** (trained with RL from scratch, without any SFT warmup), the chain of thought is often **not understandable to humans**: the model may switch languages mid-reasoning, use cryptic shorthands, or produce a stream of tokens that leads to the correct answer without making any sense to humans.
+
+## GRPO (Group Relative Policy Optimization)
+<!-- type: content -->
+
+Introduced by DeepSeek (2024). Eliminates the expensive **value model** from PPO.
+
+Given a prompt $x$:
+
+1. Generate $B$ answers $y_1, \ldots, y_B$ (a *group*).
+2. Score each with the verifier → rewards $r_1, \ldots, r_B$.
+3. Compute group-relative advantages: $A_i = \dfrac{r_i - \bar{r}}{\sigma_r}$
+
+This turns absolute rewards into relative ones: the model learns what makes *this group's* best answer better than the rest.
+
+## SFT vs RL: a fundamental difference
+<!-- type: content -->
+
+```{python}
+x = np.arange(10)
+sft_probs = np.array([0.15, 0.12, 0.11, 0.10, 0.10, 0.09, 0.09, 0.08, 0.08, 0.08])
+rl_probs  = np.array([0.45, 0.25, 0.10, 0.05, 0.04, 0.03, 0.03, 0.02, 0.02, 0.01])
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 3))
+ax1.bar(x, sft_probs, color='steelblue')
+ax1.set_title(f"After SFT: entropy = {-np.sum(sft_probs * np.log(sft_probs)):.2f}")
+ax1.set_ylim(0, 0.5)
+ax2.bar(x, rl_probs, color='coral')
+ax2.set_title(f"After RL: entropy = {-np.sum(rl_probs * np.log(rl_probs)):.2f}")
+ax2.set_ylim(0, 0.5)
+plt.suptitle("SFT (breadth-first) vs RL (depth-first)"); plt.tight_layout(); plt.show()
+```
+
+- **SFT** learns a broad distribution by imitating diverse data.
+- **RL** *sharpens* the distribution toward high-reward outputs, reducing entropy.
+
+# 7. Parameter-Efficient Fine-Tuning (LoRA)
+<!-- type: content -->
+
+Full fine-tuning updates **all** parameters. For a 70B model:
+
+- Weights: ~140 GB (in BF16)
+- Gradients: another ~140 GB
+- Adam optimizer states: another ~280 GB
+- **Total: ~560 GB**
+
+## LoRA (Low-Rank Adaptation)
+
+<u>The idea</u>. Learn an **adapter**: a small set of additional parameters that are **added** to the foundational model. The foundational model weights are kept **frozen** (never updated); only the adapter is trained.
+
+. . .
+
+Instead of learning $\Delta W \in \mathbb{R}^{d \times d}$, decompose the adapter:
+
+$$\Delta W = B A, \quad B \in \mathbb{R}^{d \times r},\ A \in \mathbb{R}^{r \times d}, \quad r \ll d$$
+
+Trainable parameters: $2dr$ instead of $d^2$.
+
+After training, the adapter can be **merged** back into the base weights ($W \leftarrow W + \Delta W$) at zero inference cost, or kept separate for easy swapping.
+
+## LoRA implementation
+<!-- type: content -->
+
+```python
+class LoRALinear(nn.Module):
+    def __init__(self, original, rank=8, alpha=16):
+        super().__init__()
+        self.original = original
+        self.original.weight.requires_grad_(False)  # freeze
+        d_out, d_in = original.weight.shape
+        self.scaling = alpha / rank
+        self.lora_A = nn.Parameter(torch.randn(rank, d_in) * 0.01)
+        self.lora_B = nn.Parameter(torch.zeros(d_out, rank))  
+
+    def forward(self, x):
+        return self.original(x) + (x @ self.lora_A.T @ self.lora_B.T) * self.scaling
+
+    def merge(self):
+        """Fold LoRA into original weights (zero inference overhead)."""
+        self.original.weight.data += self.scaling * (self.lora_B @ self.lora_A)
+        return self.original
+```
+
+```{python}
+#| echo: false
+class LoRALinear(nn.Module):
+    def __init__(self, original, rank=8, alpha=16):
+        super().__init__()
+        self.original = original
+        self.original.weight.requires_grad_(False)  # freeze
+        d_out, d_in = original.weight.shape
+        self.scaling = alpha / rank
+        self.lora_A = nn.Parameter(torch.randn(rank, d_in) * 0.01)
+        self.lora_B = nn.Parameter(torch.zeros(d_out, rank))  
+
+    def forward(self, x):
+        return self.original(x) + (x @ self.lora_A.T @ self.lora_B.T) * self.scaling
+
+    def merge(self):
+        """Fold LoRA into original weights (zero inference overhead)."""
+        self.original.weight.data += self.scaling * (self.lora_B @ self.lora_A)
+        return self.original
+
+d = 4096
+orig = nn.Linear(d, d, bias=False)
+for r in [4, 8, 16, 32, 64]:
+    lora = LoRALinear(orig, rank=r)
+    trainable = lora.lora_A.numel() + lora.lora_B.numel()
+    total = orig.weight.numel()
+    print(f"rank={r:3d}: {trainable:>8,} trainable / {total:>12,} total ({trainable/total:.2%})")
+```
+
+## Which matrices to apply LoRA to
+<!-- type: content -->
+
+In a transformer, LoRA is typically applied to the **attention projection matrices** ($W_Q, W_K, W_V, W_O$) and sometimes the MLP layers.
+
+```{python}
+#| echo: true
+from peft import LoraConfig, get_peft_model
+from transformers import AutoModelForCausalLM
+
+base_model = AutoModelForCausalLM.from_pretrained("HuggingFaceTB/SmolLM2-135M-Instruct")
+
+lora_config = LoraConfig(
+    r=16,                           # rank
+    lora_alpha=32,                  # scaling factor
+    target_modules=["q_proj", "v_proj"],   # apply to Q and V projections
+    lora_dropout=0.05,
+    bias="none",
+)
+
+model = get_peft_model(base_model, lora_config)
+model.print_trainable_parameters()
+```
+
+## QLoRA: quantized LoRA
+<!-- type: content -->
+
+Combine quantization with LoRA for even lower memory:
+
+1. Load the model in **4-bit** (NF4 quantization): weights are quantized, not gradients.
+2. Attach LoRA adapters in FP16.
+3. Only the LoRA parameters are trained.
+
+This allows fine-tuning a **65B model on a single 48 GB GPU**.
+
+| Method | Trainable params | Memory (70B) | Quality |
+|--------|:---:|:---:|:---:|
+| Full fine-tuning | 100% | ~560 GB | Best |
+| LoRA (rank 16) | ~0.1% | ~160 GB | Near-full |
+| QLoRA (4-bit + rank 16) | ~0.1% | ~40 GB | Close to LoRA |

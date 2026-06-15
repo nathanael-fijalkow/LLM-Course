@@ -1,0 +1,1369 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js" integrity="sha384-ZvpUoO/+PpLXR1lu4jmpXWu80pZlYUAfxl5NsBMWOEPSjUn/6Z/hRTt8+pR6L4N2" crossorigin="anonymous"></script><script src="05_post_training_files/libs/clipboard/clipboard.min.js"></script>
+<script src="05_post_training_files/libs/quarto-html/tabby.min.js"></script>
+<script src="05_post_training_files/libs/quarto-html/popper.min.js"></script>
+<script src="05_post_training_files/libs/quarto-html/tippy.umd.min.js"></script>
+<link href="05_post_training_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="05_post_training_files/libs/quarto-html/light-border.css" rel="stylesheet">
+<link href="05_post_training_files/libs/quarto-html/quarto-syntax-highlighting-dark-6b6957c917596b414ec0b78690761e87.css" rel="stylesheet" id="quarto-text-highlighting-styles"><meta charset="utf-8">
+  <meta name="generator" content="quarto-1.9.38">
+
+  <meta name="author" content="Nathanaël Fijalkow,  CNRS, LaBRI, University of Bordeaux, NukkAI, Paris">
+  <title>Large Language Models</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+  <link rel="stylesheet" href="05_post_training_files/libs/revealjs/dist/reset.css">
+  <link rel="stylesheet" href="05_post_training_files/libs/revealjs/dist/reveal.css">
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+      vertical-align: middle;
+    }
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+      }
+    pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+    div.sourceCode
+      { color: #e1e4e8; background-color: #24292e; }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span { color: #e1e4e8; } /* Normal */
+    code span.al { color: #ff5555; font-weight: bold; } /* Alert */
+    code span.an { color: #6a737d; } /* Annotation */
+    code span.at { color: #f97583; } /* Attribute */
+    code span.bn { color: #79b8ff; } /* BaseN */
+    code span.bu { color: #f97583; } /* BuiltIn */
+    code span.cf { color: #f97583; } /* ControlFlow */
+    code span.ch { color: #9ecbff; } /* Char */
+    code span.cn { color: #79b8ff; } /* Constant */
+    code span.co { color: #6a737d; } /* Comment */
+    code span.cv { color: #6a737d; } /* CommentVar */
+    code span.do { color: #6a737d; } /* Documentation */
+    code span.dt { color: #f97583; } /* DataType */
+    code span.dv { color: #79b8ff; } /* DecVal */
+    code span.er { color: #ff5555; text-decoration: underline; } /* Error */
+    code span.ex { color: #f97583; font-weight: bold; } /* Extension */
+    code span.fl { color: #79b8ff; } /* Float */
+    code span.fu { color: #b392f0; } /* Function */
+    code span.im { color: #9ecbff; } /* Import */
+    code span.in { color: #6a737d; } /* Information */
+    code span.kw { color: #f97583; } /* Keyword */
+    code span.op { color: #e1e4e8; } /* Operator */
+    code span.ot { color: #b392f0; } /* Other */
+    code span.pp { color: #f97583; } /* Preprocessor */
+    code span.re { color: #6a737d; } /* RegionMarker */
+    code span.sc { color: #79b8ff; } /* SpecialChar */
+    code span.ss { color: #9ecbff; } /* SpecialString */
+    code span.st { color: #9ecbff; } /* String */
+    code span.va { color: #ffab70; } /* Variable */
+    code span.vs { color: #9ecbff; } /* VerbatimString */
+    code span.wa { color: #ff5555; } /* Warning */
+  </style>
+  <link rel="stylesheet" href="05_post_training_files/libs/revealjs/dist/theme/quarto-84b150702567ae7e15cad124fb9039e2.css">
+  <link rel="stylesheet" href="custom.css">
+  <script>window.backupDefine = window.define; window.define = undefined;</script><script src="https://cdn.jsdelivr.net/npm/katex@latest/dist/katex.min.js"></script>
+  <script>document.addEventListener("DOMContentLoaded", function () {
+ var mathElements = document.getElementsByClassName("math");
+ var macros = [];
+ for (var i = 0; i < mathElements.length; i++) {
+  var texText = mathElements[i].firstChild;
+  if (mathElements[i].tagName == "SPAN") {
+   katex.render(texText.data, mathElements[i], {
+    displayMode: mathElements[i].classList.contains('display'),
+    throwOnError: false,
+    macros: macros,
+    fleqn: false
+   });
+}}});
+  </script>
+  <script>window.define = window.backupDefine; window.backupDefine = undefined;</script><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@latest/dist/katex.min.css">
+  <link href="05_post_training_files/libs/revealjs/plugin/quarto-line-highlight/line-highlight.css" rel="stylesheet">
+  <link href="05_post_training_files/libs/revealjs/plugin/reveal-menu/menu.css" rel="stylesheet">
+  <link href="05_post_training_files/libs/revealjs/plugin/reveal-menu/quarto-menu.css" rel="stylesheet">
+  <link href="05_post_training_files/libs/revealjs/plugin/reveal-chalkboard/font-awesome/css/all.css" rel="stylesheet">
+  <link href="05_post_training_files/libs/revealjs/plugin/reveal-chalkboard/style.css" rel="stylesheet">
+  <link href="05_post_training_files/libs/revealjs/plugin/quarto-support/footer.css" rel="stylesheet">
+  <style type="text/css">
+    .reveal div.sourceCode {
+      margin: 0;
+      overflow: auto;
+    }
+    .reveal div.hanging-indent {
+      margin-left: 1em;
+      text-indent: -1em;
+    }
+    .reveal .slide:not(.center) {
+      height: 100%;
+      overflow-y: auto;
+    }
+    .reveal .slide.scrollable {
+      overflow-y: auto;
+    }
+    .reveal .footnotes {
+      height: 100%;
+      overflow-y: auto;
+    }
+    .reveal .slide .absolute {
+      position: absolute;
+      display: block;
+    }
+    .reveal .footnotes ol {
+      counter-reset: ol;
+      list-style-type: none; 
+      margin-left: 0;
+    }
+    .reveal .footnotes ol li:before {
+      counter-increment: ol;
+      content: counter(ol) ". "; 
+    }
+    .reveal .footnotes ol li > p:first-child {
+      display: inline-block;
+    }
+    .reveal .slide ul,
+    .reveal .slide ol {
+      margin-bottom: 0.5em;
+    }
+    .reveal .slide ul li,
+    .reveal .slide ol li {
+      margin-top: 0.4em;
+      margin-bottom: 0.2em;
+    }
+    .reveal .slide ul[role="tablist"] li {
+      margin-bottom: 0;
+    }
+    .reveal .slide ul li > *:first-child,
+    .reveal .slide ol li > *:first-child {
+      margin-block-start: 0;
+    }
+    .reveal .slide ul li > *:last-child,
+    .reveal .slide ol li > *:last-child {
+      margin-block-end: 0;
+    }
+    .reveal .slide .columns:nth-child(3) {
+      margin-block-start: 0.8em;
+    }
+    .reveal blockquote {
+      box-shadow: none;
+    }
+    .reveal .tippy-content>* {
+      margin-top: 0.2em;
+      margin-bottom: 0.7em;
+    }
+    .reveal .tippy-content>*:last-child {
+      margin-bottom: 0.2em;
+    }
+    .reveal .slide > img.stretch.quarto-figure-center,
+    .reveal .slide > img.r-stretch.quarto-figure-center {
+      display: block;
+      margin-left: auto;
+      margin-right: auto; 
+    }
+    .reveal .slide > img.stretch.quarto-figure-left,
+    .reveal .slide > img.r-stretch.quarto-figure-left  {
+      display: block;
+      margin-left: 0;
+      margin-right: auto; 
+    }
+    .reveal .slide > img.stretch.quarto-figure-right,
+    .reveal .slide > img.r-stretch.quarto-figure-right  {
+      display: block;
+      margin-left: auto;
+      margin-right: 0; 
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/requirejs@2.3.6/require.min.js" integrity="sha384-c9c+LnTbwQ3aujuU7ULEPVvgLs+Fn6fJUvIGTsuu1ZcCf11fiEubah0ttpca4ntM sha384-6V1/AdqZRWk1KAlWbKBlGhN7VG4iE/yAZcO6NZPMF8od0vukrvr0tg4qY6NSrItx" crossorigin="anonymous"></script>
+  
+  <script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+  <script src="https://cdn.jsdelivr.net/npm/@jupyter-widgets/html-manager@*/dist/embed-amd.js" crossorigin="anonymous"></script>
+</head>
+<body class="quarto-dark">
+  <div class="reveal">
+    <div class="slides">
+
+<section id="title-slide" class="quarto-title-block center">
+  <h1 class="title">Large Language Models</h1>
+  <p class="subtitle">Part 5: Post-training</p>
+
+<div class="quarto-title-authors">
+<div class="quarto-title-author">
+<div class="quarto-title-author-name">
+Nathanaël Fijalkow, <br>CNRS, LaBRI, University of Bordeaux,<br>NukkAI, Paris 
+</div>
+</div>
+</div>
+
+</section>
+<section id="outline" class="title-slide slide level1 center scrollable">
+<h1>Outline</h1>
+<ol start="0" type="1">
+<li>Lifecycle of a Language Model</li>
+<li>What is alignment?</li>
+<li>Supervised Fine-Tuning (SFT)</li>
+<li>RLHF and reward modeling</li>
+<li>Direct Preference Optimization (DPO)</li>
+<li>KTO (Kahneman-Tversky Optimization)</li>
+<li>GRPO and reasoning models</li>
+<li>Parameter-Efficient Fine-Tuning (LoRA)</li>
+</ol>
+</section>
+
+<section>
+<section id="lifecycle-of-a-language-model" class="title-slide slide level1 center">
+<h1>0. Lifecycle of a Language Model</h1>
+<!-- type: content -->
+<p>Three main phases:</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th>Phase</th>
+<th>Key idea</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Pre-training</td>
+<td>Next-token prediction on massive corpora</td>
+</tr>
+<tr class="even">
+<td>Post-training</td>
+<td>Alignment with human preferences</td>
+</tr>
+<tr class="odd">
+<td>Inference</td>
+<td>Autoregressive generation, token by token</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="pre-training" class="slide level2">
+<h2>Pre-training</h2>
+<!-- type: content -->
+<p>Train on a massive text corpus (hundreds of billions to trillions of tokens) using <strong>next-token prediction</strong>.</p>
+<ul>
+<li>The model learns language structure, world knowledge, and reasoning patterns.</li>
+<li>Requires significant compute (hundreds to thousands of GPU-days).</li>
+<li>Produces a <strong>foundational model</strong>: a good text predictor, not yet a useful assistant.</li>
+</ul>
+</section>
+<section id="some-statistics-on-model-size" class="slide level2">
+<h2>Some statistics on model size</h2>
+<!-- type: content -->
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">Model</th>
+<th style="text-align: left;">Year</th>
+<th style="text-align: left;">Parameters</th>
+<th style="text-align: left;">Training tokens</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">GPT-2</td>
+<td style="text-align: left;">2019</td>
+<td style="text-align: left;">1.5B</td>
+<td style="text-align: left;">~10B</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">GPT-3</td>
+<td style="text-align: left;">2020</td>
+<td style="text-align: left;">175B</td>
+<td style="text-align: left;">300B</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Llama 3 (largest)</td>
+<td style="text-align: left;">2024</td>
+<td style="text-align: left;">405B</td>
+<td style="text-align: left;">15T</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">DeepSeek-V3</td>
+<td style="text-align: left;">2024</td>
+<td style="text-align: left;">671B (MoE)</td>
+<td style="text-align: left;">14T</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Llama 4 Maverick</td>
+<td style="text-align: left;">2025</td>
+<td style="text-align: left;">400B (MoE)</td>
+<td style="text-align: left;">22T</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="post-training" class="slide level2">
+<h2>Post-training</h2>
+<!-- type: content -->
+<p>Turn the foundational model into a useful assistant:</p>
+<ul>
+<li><strong>Supervised fine-tuning (SFT)</strong>: train on curated instruction-response pairs.</li>
+<li><strong>Preference optimization (RLHF, DPO, …)</strong>: use human preferences to shape outputs.</li>
+</ul>
+<p>Post-training is far cheaper than pre-training.</p>
+</section></section>
+<section>
+<section id="what-is-alignment" class="title-slide slide level1 center">
+<h1>1. What is Alignment?</h1>
+<!-- type: content -->
+<p>A <strong>foundational model</strong> completes text. Ask it <em>“What is the capital of France?”</em> and it might reply:</p>
+<blockquote>
+<p><em>“…is a question often posed on French geography quizzes. The answer, of course, depends on the era…”</em></p>
+</blockquote>
+<p>It is not trying to help you. It is predicting the most likely continuation of text it has seen before.</p>
+</section>
+<section id="the-alignment-problem" class="slide level2">
+<h2>The alignment problem</h2>
+<!-- type: content -->
+<p>Three failure modes of a foundational model:</p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Failure</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Unhelpful</strong></td>
+<td>Continues a question instead of answering it</td>
+</tr>
+<tr class="even">
+<td><strong>Harmful</strong></td>
+<td>Produces instructions for dangerous activities if prompted</td>
+</tr>
+<tr class="odd">
+<td><strong>Dishonest</strong></td>
+<td>Confidently generates false information (“hallucination”)</td>
+</tr>
+</tbody>
+</table>
+<div class="fragment">
+<p><strong>Alignment</strong> means training the model to be <strong>Helpful, Harmless, and Honest</strong> (Anthropic’s “3 H’s”).</p>
+</div>
+</section>
+<section id="chat-templates" class="slide level2">
+<h2>Chat templates</h2>
+<!-- type: content -->
+<p>Aligned models are fine-tuned to understand a <strong>structured conversation format</strong>. Every provider defines one:</p>
+<pre><code>&lt;|im_start|&gt;system
+You are a helpful assistant.
+&lt;|im_end|&gt;
+&lt;|im_start|&gt;user
+What is the capital of France?
+&lt;|im_end|&gt;
+&lt;|im_start|&gt;assistant
+The capital of France is Paris.
+&lt;|im_end|&gt;</code></pre>
+<div class="fragment">
+<p>This is the <strong>ChatML</strong> format (used by Qwen, SmolLM, …).</p>
+<p>Each model has its own chat template, for instance LLaMA uses <code>[INST]...[/INST]</code>. The format matters: sending input in the wrong template gives garbage outputs.</p>
+</div>
+</section>
+<section id="applying-a-chat-template-in-code" class="slide level2">
+<h2>Applying a chat template in code</h2>
+<!-- type: content -->
+<div id="12b4149e" class="cell" data-execution_count="2">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href=""></a>tokenizer <span class="op">=</span> AutoTokenizer.from_pretrained(<span class="st">"HuggingFaceTB/SmolLM2-135M-Instruct"</span>)</span>
+<span id="cb2-2"><a href=""></a></span>
+<span id="cb2-3"><a href=""></a>messages <span class="op">=</span> [</span>
+<span id="cb2-4"><a href=""></a>    {<span class="st">"role"</span>: <span class="st">"system"</span>, <span class="st">"content"</span>: <span class="st">"You are a helpful assistant."</span>},</span>
+<span id="cb2-5"><a href=""></a>    {<span class="st">"role"</span>: <span class="st">"user"</span>,   <span class="st">"content"</span>: <span class="st">"What is the capital of France?"</span>},</span>
+<span id="cb2-6"><a href=""></a>]</span>
+<span id="cb2-7"><a href=""></a></span>
+<span id="cb2-8"><a href=""></a>prompt <span class="op">=</span> tokenizer.apply_chat_template(</span>
+<span id="cb2-9"><a href=""></a>    messages,</span>
+<span id="cb2-10"><a href=""></a>    tokenize<span class="op">=</span><span class="va">False</span>,         <span class="co"># return a string, not token ids</span></span>
+<span id="cb2-11"><a href=""></a>    add_generation_prompt<span class="op">=</span><span class="va">True</span>   <span class="co"># add the opening &lt;|im_start|&gt;assistant token</span></span>
+<span id="cb2-12"><a href=""></a>)</span>
+<span id="cb2-13"><a href=""></a><span class="bu">print</span>(prompt)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>&lt;|im_start|&gt;system
+You are a helpful assistant.&lt;|im_end|&gt;
+&lt;|im_start|&gt;user
+What is the capital of France?&lt;|im_end|&gt;
+&lt;|im_start|&gt;assistant
+</code></pre>
+</div>
+</div>
+<p>The model then <strong>continues</strong> from the assistant marker.</p>
+</section></section>
+<section>
+<section id="supervised-fine-tuning-sft" class="title-slide slide level1 center">
+<h1>2. Supervised Fine-Tuning (SFT)</h1>
+<!-- type: content -->
+<p>Training on high-quality, curated (prompt, response) pairs.</p>
+<p>The model learns: <em>given this conversation, predict these response tokens</em>.</p>
+<p>Key insights:</p>
+<ul>
+<li><strong>Quality &gt; quantity</strong>: 1,000 high-quality examples can outperform 50,000 mediocre ones.</li>
+<li><strong>Loss masking</strong>: compute cross-entropy only on response tokens: prompt tokens are ignored.</li>
+<li><strong>Limitation</strong>: the model learns to mimic, it doesn’t learn to rank or compare answers.</li>
+</ul>
+</section>
+<section id="loss-masking" class="slide level2">
+<h2>Loss masking</h2>
+<!-- type: content -->
+<div id="32cf0a48" class="cell" data-execution_count="3">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href=""></a>tokenizer <span class="op">=</span> AutoTokenizer.from_pretrained(<span class="st">"gpt2"</span>)</span>
+<span id="cb4-2"><a href=""></a>tokenizer.pad_token <span class="op">=</span> tokenizer.eos_token</span>
+<span id="cb4-3"><a href=""></a></span>
+<span id="cb4-4"><a href=""></a>prompt   <span class="op">=</span> <span class="st">"What is the capital of France?"</span></span>
+<span id="cb4-5"><a href=""></a>response <span class="op">=</span> <span class="st">"The capital of France is Paris."</span></span>
+<span id="cb4-6"><a href=""></a></span>
+<span id="cb4-7"><a href=""></a>prompt_ids   <span class="op">=</span> tokenizer.encode(prompt)</span>
+<span id="cb4-8"><a href=""></a>response_ids <span class="op">=</span> tokenizer.encode(<span class="st">" "</span> <span class="op">+</span> response)</span>
+<span id="cb4-9"><a href=""></a>full_ids     <span class="op">=</span> prompt_ids <span class="op">+</span> response_ids</span>
+<span id="cb4-10"><a href=""></a></span>
+<span id="cb4-11"><a href=""></a><span class="co"># -100 tells PyTorch to ignore this position in the cross-entropy loss</span></span>
+<span id="cb4-12"><a href=""></a>labels <span class="op">=</span> [<span class="op">-</span><span class="dv">100</span>] <span class="op">*</span> <span class="bu">len</span>(prompt_ids) <span class="op">+</span> response_ids</span>
+<span id="cb4-13"><a href=""></a></span>
+<span id="cb4-14"><a href=""></a><span class="cf">for</span> i, (tok_id, label) <span class="kw">in</span> <span class="bu">enumerate</span>(<span class="bu">zip</span>(full_ids, labels)):</span>
+<span id="cb4-15"><a href=""></a>    tok    <span class="op">=</span> tokenizer.decode([tok_id])</span>
+<span id="cb4-16"><a href=""></a>    status <span class="op">=</span> <span class="st">"MASKED"</span> <span class="cf">if</span> label <span class="op">==</span> <span class="op">-</span><span class="dv">100</span> <span class="cf">else</span> <span class="st">"TRAIN"</span></span>
+<span id="cb4-17"><a href=""></a>    <span class="bu">print</span>(<span class="ss">f"  [</span><span class="sc">{</span>i<span class="sc">:2d}</span><span class="ss">] </span><span class="sc">{</span>tok<span class="sc">!r:20s}</span><span class="ss"> </span><span class="sc">{</span>status<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>  [ 0] 'What'               MASKED
+  [ 1] ' is'                MASKED
+  [ 2] ' the'               MASKED
+  [ 3] ' capital'           MASKED
+  [ 4] ' of'                MASKED
+  [ 5] ' France'            MASKED
+  [ 6] '?'                  MASKED
+  [ 7] ' The'               TRAIN
+  [ 8] ' capital'           TRAIN
+  [ 9] ' of'                TRAIN
+  [10] ' France'            TRAIN
+  [11] ' is'                TRAIN
+  [12] ' Paris'             TRAIN
+  [13] '.'                  TRAIN</code></pre>
+</div>
+</div>
+<p>The gradient flows <strong>only through response tokens</strong>. The model is rewarded for producing the right response, not for predicting the prompt back.</p>
+</section>
+<section id="why-cross-entropy" class="slide level2">
+<h2>Why cross-entropy?</h2>
+<!-- type: content -->
+<p><strong>Cross-entropy = maximum likelihood estimation.</strong> For one token: <span class="math display">\mathcal{L}_{CE} = -\log p_\theta(y_t \mid y_{&lt;t}, x) = -\log \frac{e^{\text{logit}_{y_t}}}{\sum_{v} e^{\text{logit}_v}}</span></p>
+<ul>
+<li>Penalises <strong>only the probability mass on the correct token</strong>.</li>
+<li>Minimising CE over a dataset = maximising the likelihood of the training data under the model.</li>
+<li>Equivalently, minimising the KL divergence from the empirical data distribution to the model’s distribution.</li>
+</ul>
+<div class="fragment">
+<p><strong>In practice</strong>, SFT loss = cross-entropy <strong>summed over response tokens only</strong> (prompt tokens are masked with <code>ignore_index=-100</code> in PyTorch).</p>
+</div>
+</section>
+<section id="what-sft-cannot-do" class="slide level2">
+<h2>What SFT cannot do</h2>
+<!-- type: content -->
+<p>SFT teaches the model to imitate good responses. But:</p>
+<ul>
+<li><strong>It cannot improve beyond the quality of the training data.</strong> If your demonstrators write mediocre answers, the model learns mediocrity.</li>
+<li><strong>It cannot express preferences.</strong> The model cannot learn “this answer is better than that one”, only “this is the right answer.”</li>
+<li><strong>It cannot safely generalize to harmful requests.</strong> The model never sees bad examples with negative feedback.</li>
+</ul>
+<div class="fragment">
+<blockquote>
+<p>SFT alone is insufficient for safe, high-quality models. We need to teach the model to <em>prefer</em> good outputs over bad ones.</p>
+</blockquote>
+</div>
+</section></section>
+<section>
+<section id="rlhf-reinforcement-learning-from-human-feedback" class="title-slide slide level1 center">
+<h1>3. RLHF: Reinforcement Learning from Human Feedback</h1>
+<!-- type: content -->
+</section>
+<section id="why-not-just-more-sft" class="slide level2">
+<h2>Why not just more SFT?</h2>
+<p>Human preferences are hard to express as single demonstrations:</p>
+<ul>
+<li><em>“Explain quantum mechanics to a 5-year-old”</em>: is a short answer or long answer better?</li>
+<li><em>“Write a poem about sadness”</em>: there is no unique right answer.</li>
+</ul>
+<p>It is easier for humans to <strong>compare</strong> two answers than to write the ideal one.</p>
+</section>
+<section id="collecting-human-preferences" class="slide level2 scrollable">
+<h2>Collecting human preferences</h2>
+<!-- type: content -->
+<p>The pipeline starts with collecting <em>pairwise comparisons</em>:</p>
+<ol type="1">
+<li>Generate <strong>two different responses</strong> for the same prompt.</li>
+<li>Ask human annotators: <strong>which response is better?</strong></li>
+<li>Record triples: (prompt, chosen response <span class="math inline">y_w</span>, rejected response <span class="math inline">y_l</span>).</li>
+</ol>
+<p>This produces a preference dataset.</p>
+<div class="fragment">
+<p>Typical scale: tens to hundreds of thousands of comparisons.</p>
+</div>
+</section>
+<section id="the-reward-model" class="slide level2">
+<h2>The reward model</h2>
+<!-- type: content -->
+<p>A <strong>reward model</strong> <span class="math inline">r_\phi(x, y)</span> is trained to score (prompt, response) pairs so that:</p>
+<p><span class="math display">r_\phi(x, y_w) &gt; r_\phi(x, y_l)</span></p>
+<p>for every (prompt, chosen, rejected) triple in the training data.</p>
+<div class="fragment">
+<p>In the Bradley-Terry Model, the probability that <span class="math inline">y_1</span> is preferred over <span class="math inline">y_2</span>: <span class="math display">P(y_1 \succ y_2 \mid x) = \sigma(r(x, y_1) - r(x, y_2))</span></p>
+<p>Training loss (maximize log-likelihood):</p>
+<p><span class="math display">\mathcal{L}_{\text{RM}} = -\log\sigma(r_\phi(x, y_w) - r_\phi(x, y_l))</span></p>
+</div>
+</section>
+<section id="reward-model-code" class="slide level2">
+<h2>Reward model code</h2>
+<!-- type: content -->
+<div id="c860b455" class="cell" data-execution_count="4">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href=""></a><span class="kw">class</span> SimpleRewardModel(nn.Module):</span>
+<span id="cb6-2"><a href=""></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, input_dim):</span>
+<span id="cb6-3"><a href=""></a>        <span class="bu">super</span>().<span class="fu">__init__</span>()</span>
+<span id="cb6-4"><a href=""></a>        <span class="va">self</span>.net <span class="op">=</span> nn.Sequential(</span>
+<span id="cb6-5"><a href=""></a>            nn.Linear(input_dim, <span class="dv">128</span>), nn.ReLU(),</span>
+<span id="cb6-6"><a href=""></a>            nn.Linear(<span class="dv">128</span>, <span class="dv">64</span>), nn.ReLU(),</span>
+<span id="cb6-7"><a href=""></a>            nn.Linear(<span class="dv">64</span>, <span class="dv">1</span>)</span>
+<span id="cb6-8"><a href=""></a>        )</span>
+<span id="cb6-9"><a href=""></a>    <span class="kw">def</span> forward(<span class="va">self</span>, x):</span>
+<span id="cb6-10"><a href=""></a>        <span class="cf">return</span> <span class="va">self</span>.net(x).squeeze(<span class="op">-</span><span class="dv">1</span>)</span>
+<span id="cb6-11"><a href=""></a></span>
+<span id="cb6-12"><a href=""></a><span class="kw">def</span> bt_loss(rm, x_chosen, x_rejected):</span>
+<span id="cb6-13"><a href=""></a>    <span class="cf">return</span> <span class="op">-</span>F.logsigmoid(rm(x_chosen) <span class="op">-</span> rm(x_rejected)).mean()</span>
+<span id="cb6-14"><a href=""></a></span>
+<span id="cb6-15"><a href=""></a>rm <span class="op">=</span> SimpleRewardModel(<span class="dv">32</span>)</span>
+<span id="cb6-16"><a href=""></a>opt <span class="op">=</span> torch.optim.Adam(rm.parameters(), lr<span class="op">=</span><span class="fl">1e-3</span>)</span>
+<span id="cb6-17"><a href=""></a>x_w <span class="op">=</span> torch.randn(<span class="dv">500</span>, <span class="dv">32</span>) <span class="op">+</span> <span class="fl">0.5</span>   <span class="co"># "good" responses</span></span>
+<span id="cb6-18"><a href=""></a>x_l <span class="op">=</span> torch.randn(<span class="dv">500</span>, <span class="dv">32</span>) <span class="op">-</span> <span class="fl">0.5</span>   <span class="co"># "bad" responses</span></span>
+<span id="cb6-19"><a href=""></a></span>
+<span id="cb6-20"><a href=""></a>losses <span class="op">=</span> []</span>
+<span id="cb6-21"><a href=""></a><span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">200</span>):</span>
+<span id="cb6-22"><a href=""></a>    loss <span class="op">=</span> bt_loss(rm, x_w, x_l)</span>
+<span id="cb6-23"><a href=""></a>    opt.zero_grad()<span class="op">;</span> loss.backward()<span class="op">;</span> opt.step()</span>
+<span id="cb6-24"><a href=""></a>    losses.append(loss.item())</span>
+<span id="cb6-25"><a href=""></a></span>
+<span id="cb6-26"><a href=""></a><span class="cf">with</span> torch.no_grad():</span>
+<span id="cb6-27"><a href=""></a>    acc <span class="op">=</span> (rm(x_w[:<span class="dv">50</span>]) <span class="op">&gt;</span> rm(x_l[:<span class="dv">50</span>])).<span class="bu">float</span>().mean()</span>
+<span id="cb6-28"><a href=""></a><span class="bu">print</span>(<span class="ss">f"Ranking accuracy: </span><span class="sc">{</span>acc<span class="sc">:.1%}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Ranking accuracy: 100.0%</code></pre>
+</div>
+</div>
+</section>
+<section id="from-reward-model-to-rl" class="slide level2">
+<h2>From reward model to RL</h2>
+<!-- type: content -->
+<p>With a reward model <span class="math inline">r_\phi(x, y)</span> in hand, we want to fine-tune the LLM to generate high-reward outputs.</p>
+<p><br></p>
+<p>This is a <strong>reinforcement learning</strong> problem:</p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>RL concept</th>
+<th>In this context</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Policy</strong> <span class="math inline">\pi_\theta</span></td>
+<td>The language model being trained</td>
+</tr>
+<tr class="even">
+<td><strong>State</strong></td>
+<td>Prompt + tokens generated so far</td>
+</tr>
+<tr class="odd">
+<td><strong>Action</strong></td>
+<td>Sampling the next token</td>
+</tr>
+<tr class="even">
+<td><strong>Reward</strong></td>
+<td><span class="math inline">r_\phi(x, y)</span>, given at the end of the full response (sparse)</td>
+</tr>
+</tbody>
+</table>
+<p>The model generates a complete response (a sequence of actions), then receives a single reward at the end.</p>
+</section>
+<section id="the-reference-model" class="slide level2">
+<h2>The reference model</h2>
+<!-- type: content -->
+<p>Maximizing reward alone is dangerous: the model learns to <strong>exploit</strong> the reward model.</p>
+<p><br></p>
+<p><strong>Solution</strong>: maintain a <strong>reference model</strong> <span class="math inline">\pi_\text{ref}</span>, a frozen copy of the SFT model, and add a penalty for diverging from it.</p>
+<ul>
+<li>The reference model is <strong>never updated</strong> during RL training.</li>
+<li>It acts as an anchor ensuring the policy stays close to the original SFT behaviour.</li>
+<li>Without it, the model finds adversarial outputs that score high on <span class="math inline">r_\phi</span> but are nonsense (“reward hacking”).</li>
+</ul>
+</section>
+<section id="ppo-the-rl-step" class="slide level2">
+<h2>PPO: the RL step</h2>
+<!-- type: content -->
+<p>After training the reward model, use <strong>PPO</strong> (Proximal Policy Optimization) to fine-tune the LLM:</p>
+<blockquote>
+<p>Maximize <span class="math inline">\mathbb{E}_{y \sim \pi_\theta(\cdot|x)}\bigl[r_\phi(x, y)\bigr]</span>, while staying close to the reference model.</p>
+</blockquote>
+<p>The <strong>KL penalty</strong> prevents the model from drifting too far: <span class="math display">\text{objective} = r_\phi(x, y) - \beta \cdot \text{KL}[\pi_\theta(\cdot|x) \| \pi_\text{ref}(\cdot|x)]</span></p>
+</section>
+<section id="kl-divergence" class="slide level2">
+<h2>KL divergence</h2>
+<!-- type: content -->
+<p>For two probability distributions <span class="math inline">P</span> and <span class="math inline">Q</span> over the same space: <span class="math display">\text{KL}(P \| Q) = \mathbb{E}_{x \sim P}\!\left[\log \frac{P(x)}{Q(x)}\right] = \sum_x P(x) \log \frac{P(x)}{Q(x)}</span></p>
+<p>Key properties:</p>
+<ul>
+<li><strong>Non-negative</strong>: <span class="math inline">\text{KL}(P \| Q) \geq 0</span>, with equality iff <span class="math inline">P = Q</span>.</li>
+<li><strong>Asymmetric</strong>: <span class="math inline">\text{KL}(P \| Q) \neq \text{KL}(Q \| P)</span> in general.</li>
+<li>Measures how much “surprise” you get observing samples from <span class="math inline">P</span> when you expected <span class="math inline">Q</span>.</li>
+</ul>
+<div class="fragment">
+<p>Here, <span class="math inline">\text{KL}[\pi_\theta(\cdot|x) \| \pi_\text{ref}(\cdot|x)]</span> measures how far the trained policy has drifted from the reference model. Keeping it small prevents reward hacking.</p>
+</div>
+</section>
+<section id="the-kl-penalty-in-practice" class="slide level2">
+<h2>The KL penalty in practice</h2>
+<!-- type: content -->
+<p>The full KL divergence <span class="math inline">\text{KL}[\pi_\theta(\cdot|x) \| \pi_\text{ref}(\cdot|x)]</span> sums over <strong>all possible responses</strong>: intractable for a large vocabulary.</p>
+<p><strong>Token-level approximation.</strong> Since both models are autoregressive: <span class="math display">\pi(y \mid x) = \prod_{t=1}^T \pi(y_t \mid y_{&lt;t}, x)</span></p>
+<p>the log-ratio of the policy to the reference <strong>along a sampled response</strong> <span class="math inline">y = (y_1, \ldots, y_T)</span> factorises into a sum:</p>
+<p><span class="math display">\log \frac{\pi_\theta(y \mid x)}{\pi_\text{ref}(y \mid x)} = \sum_{t=1}^{T} \log \frac{\pi_\theta(y_t \mid y_{&lt;t}, x)}{\pi_\text{ref}(y_t \mid y_{&lt;t}, x)}</span></p>
+<p>This is a <strong>per-token difference of log-probabilities</strong>: cheap to compute by running both models on the same sequence.</p>
+</section>
+<section id="issues-with-rlhf" class="slide level2 scrollable">
+<h2>Issues with RLHF</h2>
+<!-- type: content -->
+<p>PPO requires <strong>four models</strong> in memory simultaneously:</p>
+<ol type="1">
+<li><strong>Policy</strong>: the LLM being trained</li>
+<li><strong>Value model</strong>: estimates expected future reward (same size as policy!)</li>
+<li><strong>Reference model</strong>: frozen copy of the original SFT model</li>
+<li><strong>Reward model</strong>: evaluates quality</li>
+</ol>
+<p>For a 70B model, this is ~4 × 140 GB ≈ 560 GB of GPU memory. Extremely expensive.</p>
+</section>
+<section id="reward-hacking" class="slide level2">
+<h2>Reward hacking</h2>
+<!-- type: content -->
+<p>A fundamental problem: the model learns to <strong>maximize the reward model score</strong>, not actual quality. Known failure modes:</p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Failure mode</th>
+<th>What happens</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Length hacking</strong></td>
+<td>Generates very long responses: reward models often prefer verbose text</td>
+</tr>
+<tr class="even">
+<td><strong>Sycophancy</strong></td>
+<td>Agrees with the user rather than being correct</td>
+</tr>
+<tr class="odd">
+<td><strong>Formatting tricks</strong></td>
+<td>Adds bullet points, headers, etc. even when unhelpful</td>
+</tr>
+<tr class="even">
+<td><strong>Adversarial gibberish</strong></td>
+<td>Rare tokens that trick the reward model</td>
+</tr>
+</tbody>
+</table>
+<div class="fragment">
+<blockquote>
+<p>The reward model is an approximation of human preferences. Optimizing it too hard breaks the approximation.</p>
+</blockquote>
+</div>
+</section>
+<section id="rlaif-ai-feedback-instead-of-human-feedback" class="slide level2 scrollable">
+<h2>RLAIF: AI feedback instead of human feedback</h2>
+<!-- type: content -->
+<p><strong>Constitutional AI</strong> (Anthropic, 2022): replace human labelers with another AI.</p>
+<ol type="1">
+<li>Write a <strong>constitution</strong>: a list of principles (e.g.&nbsp;<em>“Do not assist with harmful activities”</em>).</li>
+<li>Use a large model to generate critiques and revisions of responses according to the constitution.</li>
+<li>Train a reward model on <strong>AI-labeled</strong> preferences.</li>
+<li>RL as usual.</li>
+</ol>
+<p>Benefits: scales to millions of comparisons; consistent; cheap.</p>
+<p>Used in Claude models. The “AI” feedback can be from a much larger, more capable model.</p>
+</section></section>
+<section>
+<section id="direct-preference-optimization-dpo" class="title-slide slide level1 center">
+<h1>4. Direct Preference Optimization (DPO)</h1>
+<!-- type: content -->
+<p><strong>Key insight</strong>: the optimal policy under RLHF can be derived in closed form: we don’t need to train a reward model separately!</p>
+</section>
+<section id="the-dpo-insight" class="slide level2">
+<h2>The DPO insight</h2>
+<p>The KL-penalised objective has a closed-form optimal policy: <span class="math display">\pi^*(y \mid x) = \frac{\pi_\text{ref}(y \mid x)\, e^{r(x,y)/\beta}}{Z(x)}, \qquad Z(x) = \sum_y \pi_\text{ref}(y \mid x)\, e^{r(x,y)/\beta}</span></p>
+<p><span class="math inline">Z(x)</span> is the <strong>partition function</strong>: the normalisation constant (summing over all completions <span class="math inline">y</span>) that makes <span class="math inline">\pi^*</span> a valid probability distribution. It depends only on the prompt <span class="math inline">x</span>, not on any specific completion.</p>
+<p>Inverting this gives the reward in terms of the policy: <span class="math display">r^*(x, y) = \beta \log \frac{\pi^*(y|x)}{\pi_\text{ref}(y|x)} + \beta \log Z(x)</span></p>
+<p>Plugging this into the Bradley-Terry loss, <span class="math inline">Z(x)</span> <strong>cancels</strong> (same prompt for <span class="math inline">y_w</span> and <span class="math inline">y_l</span>), eliminating the reward model entirely.</p>
+</section>
+<section id="the-dpo-loss" class="slide level2">
+<h2>The DPO loss</h2>
+<!-- type: content -->
+<p><span class="math display">\mathcal{L}_{\text{DPO}} = -\log\sigma\!\left(\beta \left[\log\frac{\pi_\theta(y_w|x)}{\pi_{\text{ref}}(y_w|x)} - \log\frac{\pi_\theta(y_l|x)}{\pi_{\text{ref}}(y_l|x)}\right]\right)</span></p>
+<p>Intuitively: increase the probability of the chosen response <em>relative to the reference</em>, and decrease the probability of the rejected response <em>relative to the reference</em>.</p>
+<ul>
+<li><span class="math inline">\beta</span> controls how far <span class="math inline">\pi_\theta</span> can deviate from <span class="math inline">\pi_\text{ref}</span>. High <span class="math inline">\beta</span> = stay close to SFT.</li>
+<li>Only <strong>two models</strong> needed: policy and reference. No reward model, no value model.</li>
+</ul>
+</section></section>
+<section>
+<section id="kto-kahneman-tversky-optimization" class="title-slide slide level1 center">
+<h1>5. KTO (Kahneman-Tversky Optimization)</h1>
+<!-- type: content -->
+<p>In practice, pairwise comparisons are expensive to collect. <strong>KTO</strong> works with simple <strong>good / bad</strong> labels: no pairing required.</p>
+<p>Inspired by <em>Prospect Theory</em> (Kahneman &amp; Tversky):</p>
+<ul>
+<li><strong>Loss aversion</strong>: humans feel losses more strongly than equivalent gains.</li>
+<li><strong>Diminishing sensitivity</strong>: going from $10→$20 feels larger than $110→$120.</li>
+</ul>
+</section>
+<section id="kto-loss" class="slide level2">
+<h2>KTO loss</h2>
+<!-- type: content -->
+<p>The KTO objective compares each completion to a <em>reference level</em> <span class="math inline">z_\text{ref}</span> (the average log-ratio):</p>
+<p><span class="math display">\begin{array}{lll}
+\mathcal{L}_{\text{KTO}} &amp; = &amp; \lambda_D \cdot \mathbb{E}_{\text{good}} \left[1 - \sigma\!\left(\beta(\log\frac{\pi_\theta(y|x)}{\pi_\text{ref}(y|x)} - z_\text{ref})\right)\right] \\[0.5em]
+&amp; + &amp; \lambda_U \cdot \mathbb{E}_{\text{bad}} \left[1 - \sigma\!\left(-\beta(\log\frac{\pi_\theta(y|x)}{\pi_\text{ref}(y|x)} - z_\text{ref})\right)\right]
+\end{array}</span></p>
+<p>Good outputs are rewarded when above average; bad outputs are penalized when above average.</p>
+<div class="fragment">
+<p><strong>How is <span class="math inline">z_\text{ref}</span> computed?</strong> It is estimated per mini-batch as the mean log-ratio over <em>other</em> examples in the batch: <span class="math display">z_\text{ref} = \mathbb{E}_{(x',y') \sim \mathcal{D}}\!\left[\log \frac{\pi_\theta(y' \mid x')}{\pi_\text{ref}(y' \mid x')}\right]</span></p>
+<p>This measures the <em>average</em> policy deviation from the reference model.</p>
+</div>
+</section></section>
+<section>
+<section id="grpo-and-reasoning-models" class="title-slide slide level1 center">
+<h1>6. GRPO and Reasoning Models</h1>
+<!-- type: content -->
+<p><strong>Chain-of-Thought (CoT)</strong>: asking the model to reason step-by-step before answering significantly improves performance on hard tasks.</p>
+<p>For tasks with <strong>verifiable answers</strong> (math, code, logic puzzles), we can evaluate the final answer automatically: no human or reward model needed.</p>
+<blockquote>
+<p>If the answer is objectively right or wrong, we have a perfect reward signal.</p>
+</blockquote>
+</section>
+<section id="reinforcement-learning-with-verifiable-rewards" class="slide level2">
+<h2>Reinforcement learning with verifiable rewards</h2>
+<!-- type: content -->
+<p>Two types of rewards:</p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 26%">
+<col style="width: 34%">
+<col style="width: 39%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Type</th>
+<th>Source</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Correctness</strong></td>
+<td>Automated verifier</td>
+<td>Is the final answer correct?</td>
+</tr>
+<tr class="even">
+<td><strong>Format</strong></td>
+<td>Rule-based check</td>
+<td>Is the answer boxed? Is the reasoning well-structured?</td>
+</tr>
+</tbody>
+</table>
+<div class="fragment">
+<blockquote>
+<p><strong>The reasoning process itself is never evaluated</strong>, only the final answer. The model is entirely free to reason in any way it finds useful, even in ways that are not interpretable to humans.</p>
+</blockquote>
+</div>
+</section>
+<section id="deepseek-r1-2025" class="slide level2">
+<h2>DeepSeek R1 (2025)</h2>
+<p>DeepSeek trained a reasoning model using RL with verifiable rewards on math and code problems. Emergent behaviors observed:</p>
+<ul>
+<li><strong>Self-reflection</strong>: the model spontaneously backtracks (“Wait, that’s wrong…”)</li>
+<li><strong>Longer chains of thought</strong> on harder problems</li>
+<li><strong>“Aha moments”</strong>: the model discovers a better strategy mid-reasoning</li>
+</ul>
+<div class="fragment">
+<p><br></p>
+<p>In <strong>R1-Zero</strong> (trained with RL from scratch, without any SFT warmup), the chain of thought is often <strong>not understandable to humans</strong>: the model may switch languages mid-reasoning, use cryptic shorthands, or produce a stream of tokens that leads to the correct answer without making any sense to humans.</p>
+</div>
+</section>
+<section id="grpo-group-relative-policy-optimization" class="slide level2 scrollable">
+<h2>GRPO (Group Relative Policy Optimization)</h2>
+<!-- type: content -->
+<p>Introduced by DeepSeek (2024). Eliminates the expensive <strong>value model</strong> from PPO.</p>
+<p>Given a prompt <span class="math inline">x</span>:</p>
+<ol type="1">
+<li>Generate <span class="math inline">B</span> answers <span class="math inline">y_1, \ldots, y_B</span> (a <em>group</em>).</li>
+<li>Score each with the verifier → rewards <span class="math inline">r_1, \ldots, r_B</span>.</li>
+<li>Compute group-relative advantages: <span class="math inline">A_i = \dfrac{r_i - \bar{r}}{\sigma_r}</span></li>
+</ol>
+<p>This turns absolute rewards into relative ones: the model learns what makes <em>this group’s</em> best answer better than the rest.</p>
+</section>
+<section id="sft-vs-rl-a-fundamental-difference" class="slide level2">
+<h2>SFT vs RL: a fundamental difference</h2>
+<!-- type: content -->
+<div id="e2827e22" class="cell" data-execution_count="5">
+<div class="cell-output cell-output-display">
+<div>
+<figure>
+<p><img data-src="05_post_training_files/figure-revealjs/cell-6-output-1.png" width="952" height="287"></p>
+</figure>
+</div>
+</div>
+</div>
+<ul>
+<li><strong>SFT</strong> learns a broad distribution by imitating diverse data.</li>
+<li><strong>RL</strong> <em>sharpens</em> the distribution toward high-reward outputs, reducing entropy.</li>
+</ul>
+</section></section>
+<section>
+<section id="parameter-efficient-fine-tuning-lora" class="title-slide slide level1 center">
+<h1>7. Parameter-Efficient Fine-Tuning (LoRA)</h1>
+<!-- type: content -->
+<p>Full fine-tuning updates <strong>all</strong> parameters. For a 70B model:</p>
+<ul>
+<li>Weights: ~140 GB (in BF16)</li>
+<li>Gradients: another ~140 GB</li>
+<li>Adam optimizer states: another ~280 GB</li>
+<li><strong>Total: ~560 GB</strong></li>
+</ul>
+</section>
+<section id="lora-low-rank-adaptation" class="slide level2">
+<h2>LoRA (Low-Rank Adaptation)</h2>
+<p><u>The idea</u>. Learn an <strong>adapter</strong>: a small set of additional parameters that are <strong>added</strong> to the foundational model. The foundational model weights are kept <strong>frozen</strong> (never updated); only the adapter is trained.</p>
+<div class="fragment">
+<p>Instead of learning <span class="math inline">\Delta W \in \mathbb{R}^{d \times d}</span>, decompose the adapter:</p>
+<p><span class="math display">\Delta W = B A, \quad B \in \mathbb{R}^{d \times r},\ A \in \mathbb{R}^{r \times d}, \quad r \ll d</span></p>
+<p>Trainable parameters: <span class="math inline">2dr</span> instead of <span class="math inline">d^2</span>.</p>
+<p>After training, the adapter can be <strong>merged</strong> back into the base weights (<span class="math inline">W \leftarrow W + \Delta W</span>) at zero inference cost, or kept separate for easy swapping.</p>
+</div>
+</section>
+<section id="lora-implementation" class="slide level2">
+<h2>LoRA implementation</h2>
+<!-- type: content -->
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href=""></a><span class="kw">class</span> LoRALinear(nn.Module):</span>
+<span id="cb8-2"><a href=""></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, original, rank<span class="op">=</span><span class="dv">8</span>, alpha<span class="op">=</span><span class="dv">16</span>):</span>
+<span id="cb8-3"><a href=""></a>        <span class="bu">super</span>().<span class="fu">__init__</span>()</span>
+<span id="cb8-4"><a href=""></a>        <span class="va">self</span>.original <span class="op">=</span> original</span>
+<span id="cb8-5"><a href=""></a>        <span class="va">self</span>.original.weight.requires_grad_(<span class="va">False</span>)  <span class="co"># freeze</span></span>
+<span id="cb8-6"><a href=""></a>        d_out, d_in <span class="op">=</span> original.weight.shape</span>
+<span id="cb8-7"><a href=""></a>        <span class="va">self</span>.scaling <span class="op">=</span> alpha <span class="op">/</span> rank</span>
+<span id="cb8-8"><a href=""></a>        <span class="va">self</span>.lora_A <span class="op">=</span> nn.Parameter(torch.randn(rank, d_in) <span class="op">*</span> <span class="fl">0.01</span>)</span>
+<span id="cb8-9"><a href=""></a>        <span class="va">self</span>.lora_B <span class="op">=</span> nn.Parameter(torch.zeros(d_out, rank))  </span>
+<span id="cb8-10"><a href=""></a></span>
+<span id="cb8-11"><a href=""></a>    <span class="kw">def</span> forward(<span class="va">self</span>, x):</span>
+<span id="cb8-12"><a href=""></a>        <span class="cf">return</span> <span class="va">self</span>.original(x) <span class="op">+</span> (x <span class="op">@</span> <span class="va">self</span>.lora_A.T <span class="op">@</span> <span class="va">self</span>.lora_B.T) <span class="op">*</span> <span class="va">self</span>.scaling</span>
+<span id="cb8-13"><a href=""></a></span>
+<span id="cb8-14"><a href=""></a>    <span class="kw">def</span> merge(<span class="va">self</span>):</span>
+<span id="cb8-15"><a href=""></a>        <span class="co">"""Fold LoRA into original weights (zero inference overhead)."""</span></span>
+<span id="cb8-16"><a href=""></a>        <span class="va">self</span>.original.weight.data <span class="op">+=</span> <span class="va">self</span>.scaling <span class="op">*</span> (<span class="va">self</span>.lora_B <span class="op">@</span> <span class="va">self</span>.lora_A)</span>
+<span id="cb8-17"><a href=""></a>        <span class="cf">return</span> <span class="va">self</span>.original</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div id="d3560be3" class="cell" data-execution_count="6">
+<div class="cell-output cell-output-stdout">
+<pre><code>rank=  4:   32,768 trainable /   16,777,216 total (0.20%)
+rank=  8:   65,536 trainable /   16,777,216 total (0.39%)
+rank= 16:  131,072 trainable /   16,777,216 total (0.78%)
+rank= 32:  262,144 trainable /   16,777,216 total (1.56%)
+rank= 64:  524,288 trainable /   16,777,216 total (3.12%)</code></pre>
+</div>
+</div>
+</section>
+<section id="which-matrices-to-apply-lora-to" class="slide level2">
+<h2>Which matrices to apply LoRA to</h2>
+<!-- type: content -->
+<p>In a transformer, LoRA is typically applied to the <strong>attention projection matrices</strong> (<span class="math inline">W_Q, W_K, W_V, W_O</span>) and sometimes the MLP layers.</p>
+<div id="f2ca74fe" class="cell" data-execution_count="7">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href=""></a><span class="im">from</span> peft <span class="im">import</span> LoraConfig, get_peft_model</span>
+<span id="cb10-2"><a href=""></a><span class="im">from</span> transformers <span class="im">import</span> AutoModelForCausalLM</span>
+<span id="cb10-3"><a href=""></a></span>
+<span id="cb10-4"><a href=""></a>base_model <span class="op">=</span> AutoModelForCausalLM.from_pretrained(<span class="st">"HuggingFaceTB/SmolLM2-135M-Instruct"</span>)</span>
+<span id="cb10-5"><a href=""></a></span>
+<span id="cb10-6"><a href=""></a>lora_config <span class="op">=</span> LoraConfig(</span>
+<span id="cb10-7"><a href=""></a>    r<span class="op">=</span><span class="dv">16</span>,                           <span class="co"># rank</span></span>
+<span id="cb10-8"><a href=""></a>    lora_alpha<span class="op">=</span><span class="dv">32</span>,                  <span class="co"># scaling factor</span></span>
+<span id="cb10-9"><a href=""></a>    target_modules<span class="op">=</span>[<span class="st">"q_proj"</span>, <span class="st">"v_proj"</span>],   <span class="co"># apply to Q and V projections</span></span>
+<span id="cb10-10"><a href=""></a>    lora_dropout<span class="op">=</span><span class="fl">0.05</span>,</span>
+<span id="cb10-11"><a href=""></a>    bias<span class="op">=</span><span class="st">"none"</span>,</span>
+<span id="cb10-12"><a href=""></a>)</span>
+<span id="cb10-13"><a href=""></a></span>
+<span id="cb10-14"><a href=""></a>model <span class="op">=</span> get_peft_model(base_model, lora_config)</span>
+<span id="cb10-15"><a href=""></a>model.print_trainable_parameters()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<script type="application/vnd.jupyter.widget-view+json">
+{"model_id":"52dd56e1f0f4468f8db16d0f2aedf657","version_major":2,"version_minor":0,"quarto_mimetype":"application/vnd.jupyter.widget-view+json"}
+</script>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>trainable params: 921,600 || all params: 135,436,608 || trainable%: 0.6805</code></pre>
+</div>
+</div>
+</section>
+<section id="qlora-quantized-lora" class="slide level2 scrollable">
+<h2>QLoRA: quantized LoRA</h2>
+<!-- type: content -->
+<p>Combine quantization with LoRA for even lower memory:</p>
+<ol type="1">
+<li>Load the model in <strong>4-bit</strong> (NF4 quantization): weights are quantized, not gradients.</li>
+<li>Attach LoRA adapters in FP16.</li>
+<li>Only the LoRA parameters are trained.</li>
+</ol>
+<p>This allows fine-tuning a <strong>65B model on a single 48 GB GPU</strong>.</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th>Method</th>
+<th style="text-align: center;">Trainable params</th>
+<th style="text-align: center;">Memory (70B)</th>
+<th style="text-align: center;">Quality</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Full fine-tuning</td>
+<td style="text-align: center;">100%</td>
+<td style="text-align: center;">~560 GB</td>
+<td style="text-align: center;">Best</td>
+</tr>
+<tr class="even">
+<td>LoRA (rank 16)</td>
+<td style="text-align: center;">~0.1%</td>
+<td style="text-align: center;">~160 GB</td>
+<td style="text-align: center;">Near-full</td>
+</tr>
+<tr class="odd">
+<td>QLoRA (4-bit + rank 16)</td>
+<td style="text-align: center;">~0.1%</td>
+<td style="text-align: center;">~40 GB</td>
+<td style="text-align: center;">Close to LoRA</td>
+</tr>
+</tbody>
+</table>
+
+</section></section>
+    </div>
+  <div class="quarto-auto-generated-content" style="display: none;">
+<div class="footer footer-default">
+
+</div>
+</div></div>
+
+  <script>window.backupDefine = window.define; window.define = undefined;</script>
+  <script src="05_post_training_files/libs/revealjs/dist/reveal.js"></script>
+  <!-- reveal.js plugins -->
+  <script src="05_post_training_files/libs/revealjs/plugin/quarto-line-highlight/line-highlight.js"></script>
+  <script src="05_post_training_files/libs/revealjs/plugin/pdf-export/pdfexport.js"></script>
+  <script src="05_post_training_files/libs/revealjs/plugin/reveal-menu/menu.js"></script>
+  <script src="05_post_training_files/libs/revealjs/plugin/reveal-menu/quarto-menu.js"></script>
+  <script src="05_post_training_files/libs/revealjs/plugin/reveal-chalkboard/plugin.js"></script>
+  <script src="05_post_training_files/libs/revealjs/plugin/quarto-support/support.js"></script>
+  
+
+  <script src="05_post_training_files/libs/revealjs/plugin/notes/notes.js"></script>
+  <script src="05_post_training_files/libs/revealjs/plugin/search/search.js"></script>
+  <script src="05_post_training_files/libs/revealjs/plugin/zoom/zoom.js"></script>
+  <script>window.define = window.backupDefine; window.backupDefine = undefined;</script>
+
+  <script>
+
+      // Full list of configuration options available at:
+      // https://revealjs.com/config/
+      Reveal.initialize({
+'controlsAuto': true,
+'previewLinksAuto': false,
+'pdfSeparateFragments': false,
+'autoAnimateEasing': "ease",
+'autoAnimateDuration': 1,
+'autoAnimateUnmatched': true,
+'jumpToSlide': true,
+'menu': {"side":"left","useTextContentForMissingTitles":true,"markers":false,"loadIcons":false,"custom":[{"title":"Tools","icon":"<i class=\"fas fa-gear\"></i>","content":"<ul class=\"slide-menu-items\">\n<li class=\"slide-tool-item active\" data-item=\"0\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.fullscreen(event)\"><kbd>f</kbd> Fullscreen</a></li>\n<li class=\"slide-tool-item\" data-item=\"1\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.speakerMode(event)\"><kbd>s</kbd> Speaker View</a></li>\n<li class=\"slide-tool-item\" data-item=\"2\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.overview(event)\"><kbd>o</kbd> Slide Overview</a></li>\n<li class=\"slide-tool-item\" data-item=\"3\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.togglePdfExport(event)\"><kbd>e</kbd> PDF Export Mode</a></li>\n<li class=\"slide-tool-item\" data-item=\"4\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.toggleScrollView(event)\"><kbd>r</kbd> Scroll View Mode</a></li>\n<li class=\"slide-tool-item\" data-item=\"5\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.toggleChalkboard(event)\"><kbd>b</kbd> Toggle Chalkboard</a></li>\n<li class=\"slide-tool-item\" data-item=\"6\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.toggleNotesCanvas(event)\"><kbd>c</kbd> Toggle Notes Canvas</a></li>\n<li class=\"slide-tool-item\" data-item=\"7\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.downloadDrawings(event)\"><kbd>d</kbd> Download Drawings</a></li>\n<li class=\"slide-tool-item\" data-item=\"8\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.keyboardHelp(event)\"><kbd>?</kbd> Keyboard Help</a></li>\n</ul>"}],"openButton":true},
+'chalkboard': {"buttons":true},
+'smaller': true,
+ 
+        // Display controls in the bottom right corner
+        controls: false,
+
+        // Help the user learn the controls by providing hints, for example by
+        // bouncing the down arrow when they first encounter a vertical slide
+        controlsTutorial: false,
+
+        // Determines where controls appear, "edges" or "bottom-right"
+        controlsLayout: 'edges',
+
+        // Visibility rule for backwards navigation arrows; "faded", "hidden"
+        // or "visible"
+        controlsBackArrows: 'faded',
+
+        // Display a presentation progress bar
+        progress: true,
+
+        // Display the page number of the current slide
+        slideNumber: 'c/t',
+
+        // 'all', 'print', or 'speaker'
+        showSlideNumber: 'all',
+
+        // Add the current slide number to the URL hash so that reloading the
+        // page/copying the URL will return you to the same slide
+        hash: true,
+
+        // Start with 1 for the hash rather than 0
+        hashOneBasedIndex: false,
+
+        // Flags if we should monitor the hash and change slides accordingly
+        respondToHashChanges: true,
+
+        // Push each slide change to the browser history
+        history: true,
+
+        // Enable keyboard shortcuts for navigation
+        keyboard: true,
+
+        // Enable the slide overview mode
+        overview: true,
+
+        // Disables the default reveal.js slide layout (scaling and centering)
+        // so that you can use custom CSS layout
+        disableLayout: false,
+
+        // Vertical centering of slides
+        center: false,
+
+        // Enables touch navigation on devices with touch input
+        touch: true,
+
+        // Loop the presentation
+        loop: false,
+
+        // Change the presentation direction to be RTL
+        rtl: false,
+
+        // see https://revealjs.com/vertical-slides/#navigation-mode
+        navigationMode: 'linear',
+
+        // Randomizes the order of slides each time the presentation loads
+        shuffle: false,
+
+        // Turns fragments on and off globally
+        fragments: true,
+
+        // Flags whether to include the current fragment in the URL,
+        // so that reloading brings you to the same fragment position
+        fragmentInURL: false,
+
+        // Flags if the presentation is running in an embedded mode,
+        // i.e. contained within a limited portion of the screen
+        embedded: false,
+
+        // Flags if we should show a help overlay when the questionmark
+        // key is pressed
+        help: true,
+
+        // Flags if it should be possible to pause the presentation (blackout)
+        pause: true,
+
+        // Flags if speaker notes should be visible to all viewers
+        showNotes: false,
+
+        // Global override for autoplaying embedded media (null/true/false)
+        autoPlayMedia: null,
+
+        // Global override for preloading lazy-loaded iframes (null/true/false)
+        preloadIframes: null,
+
+        // Number of milliseconds between automatically proceeding to the
+        // next slide, disabled when set to 0, this value can be overwritten
+        // by using a data-autoslide attribute on your slides
+        autoSlide: 0,
+
+        // Stop auto-sliding after user input
+        autoSlideStoppable: true,
+
+        // Use this method for navigation when auto-sliding
+        autoSlideMethod: null,
+
+        // Specify the average time in seconds that you think you will spend
+        // presenting each slide. This is used to show a pacing timer in the
+        // speaker view
+        defaultTiming: null,
+
+        // Enable slide navigation via mouse wheel
+        mouseWheel: false,
+
+        // The display mode that will be used to show slides
+        display: 'block',
+
+        // Hide cursor if inactive
+        hideInactiveCursor: true,
+
+        // Time before the cursor is hidden (in ms)
+        hideCursorTime: 5000,
+
+        // Opens links in an iframe preview overlay
+        previewLinks: false,
+
+        // Transition style (none/fade/slide/convex/concave/zoom)
+        transition: 'none',
+
+        // Transition speed (default/fast/slow)
+        transitionSpeed: 'default',
+
+        // Transition style for full page slide backgrounds
+        // (none/fade/slide/convex/concave/zoom)
+        backgroundTransition: 'none',
+
+        // Number of slides away from the current that are visible
+        viewDistance: 3,
+
+        // Number of slides away from the current that are visible on mobile
+        // devices. It is advisable to set this to a lower number than
+        // viewDistance in order to save resources.
+        mobileViewDistance: 2,
+
+        // The "normal" size of the presentation, aspect ratio will be preserved
+        // when the presentation is scaled to fit different resolutions. Can be
+        // specified using percentage units.
+        width: 1050,
+
+        height: 700,
+
+        // Factor of the display size that should remain empty around the content
+        margin: 0.1,
+
+        // reveal.js plugins
+        plugins: [QuartoLineHighlight, PdfExport, RevealMenu, RevealChalkboard, QuartoSupport,
+
+          RevealNotes,
+          RevealSearch,
+          RevealZoom
+        ]
+      });
+    </script>
+    <script type="application/vnd.jupyter.widget-state+json">
+    {"state":{"02307bfb85764f11ba407dd374027e7b":{"model_module":"@jupyter-widgets/base","model_module_version":"2.0.0","model_name":"LayoutModel","state":{"_model_module":"@jupyter-widgets/base","_model_module_version":"2.0.0","_model_name":"LayoutModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"LayoutView","align_content":null,"align_items":null,"align_self":null,"border_bottom":null,"border_left":null,"border_right":null,"border_top":null,"bottom":null,"display":null,"flex":null,"flex_flow":null,"grid_area":null,"grid_auto_columns":null,"grid_auto_flow":null,"grid_auto_rows":null,"grid_column":null,"grid_gap":null,"grid_row":null,"grid_template_areas":null,"grid_template_columns":null,"grid_template_rows":null,"height":null,"justify_content":null,"justify_items":null,"left":null,"margin":null,"max_height":null,"max_width":null,"min_height":null,"min_width":null,"object_fit":null,"object_position":null,"order":null,"overflow":null,"padding":null,"right":null,"top":null,"visibility":null,"width":null}},"083024f2390e4211a53827c6d461fd77":{"model_module":"@jupyter-widgets/base","model_module_version":"2.0.0","model_name":"LayoutModel","state":{"_model_module":"@jupyter-widgets/base","_model_module_version":"2.0.0","_model_name":"LayoutModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"LayoutView","align_content":null,"align_items":null,"align_self":null,"border_bottom":null,"border_left":null,"border_right":null,"border_top":null,"bottom":null,"display":null,"flex":null,"flex_flow":null,"grid_area":null,"grid_auto_columns":null,"grid_auto_flow":null,"grid_auto_rows":null,"grid_column":null,"grid_gap":null,"grid_row":null,"grid_template_areas":null,"grid_template_columns":null,"grid_template_rows":null,"height":null,"justify_content":null,"justify_items":null,"left":null,"margin":null,"max_height":null,"max_width":null,"min_height":null,"min_width":null,"object_fit":null,"object_position":null,"order":null,"overflow":null,"padding":null,"right":null,"top":null,"visibility":null,"width":null}},"3c0a6f866f364269bd2194ecec6af545":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"HTMLStyleModel","state":{"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"HTMLStyleModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"StyleView","background":null,"description_width":"","font_size":null,"text_color":null}},"52dd56e1f0f4468f8db16d0f2aedf657":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"HBoxModel","state":{"_dom_classes":[],"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"HBoxModel","_view_count":null,"_view_module":"@jupyter-widgets/controls","_view_module_version":"2.0.0","_view_name":"HBoxView","box_style":"","children":["IPY_MODEL_620d44d8d8834cbdb0d368ca3533895d","IPY_MODEL_c51596416c2e4b809bb6fe28b587cdd5","IPY_MODEL_b080a35c80d64e88ab33ce49b46c07c9"],"layout":"IPY_MODEL_083024f2390e4211a53827c6d461fd77","tabbable":null,"tooltip":null}},"620d44d8d8834cbdb0d368ca3533895d":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"HTMLModel","state":{"_dom_classes":[],"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"HTMLModel","_view_count":null,"_view_module":"@jupyter-widgets/controls","_view_module_version":"2.0.0","_view_name":"HTMLView","description":"","description_allow_html":false,"layout":"IPY_MODEL_02307bfb85764f11ba407dd374027e7b","placeholder":"​","style":"IPY_MODEL_3c0a6f866f364269bd2194ecec6af545","tabbable":null,"tooltip":null,"value":"Loading weights: 100%"}},"6fd6ed0f292a4655aaac1fac4ad2a34d":{"model_module":"@jupyter-widgets/base","model_module_version":"2.0.0","model_name":"LayoutModel","state":{"_model_module":"@jupyter-widgets/base","_model_module_version":"2.0.0","_model_name":"LayoutModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"LayoutView","align_content":null,"align_items":null,"align_self":null,"border_bottom":null,"border_left":null,"border_right":null,"border_top":null,"bottom":null,"display":null,"flex":null,"flex_flow":null,"grid_area":null,"grid_auto_columns":null,"grid_auto_flow":null,"grid_auto_rows":null,"grid_column":null,"grid_gap":null,"grid_row":null,"grid_template_areas":null,"grid_template_columns":null,"grid_template_rows":null,"height":null,"justify_content":null,"justify_items":null,"left":null,"margin":null,"max_height":null,"max_width":null,"min_height":null,"min_width":null,"object_fit":null,"object_position":null,"order":null,"overflow":null,"padding":null,"right":null,"top":null,"visibility":null,"width":null}},"7b768d3fa84947fea75ed474b4654ff3":{"model_module":"@jupyter-widgets/base","model_module_version":"2.0.0","model_name":"LayoutModel","state":{"_model_module":"@jupyter-widgets/base","_model_module_version":"2.0.0","_model_name":"LayoutModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"LayoutView","align_content":null,"align_items":null,"align_self":null,"border_bottom":null,"border_left":null,"border_right":null,"border_top":null,"bottom":null,"display":null,"flex":null,"flex_flow":null,"grid_area":null,"grid_auto_columns":null,"grid_auto_flow":null,"grid_auto_rows":null,"grid_column":null,"grid_gap":null,"grid_row":null,"grid_template_areas":null,"grid_template_columns":null,"grid_template_rows":null,"height":null,"justify_content":null,"justify_items":null,"left":null,"margin":null,"max_height":null,"max_width":null,"min_height":null,"min_width":null,"object_fit":null,"object_position":null,"order":null,"overflow":null,"padding":null,"right":null,"top":null,"visibility":null,"width":null}},"96427a1e02be417da6bc2b51cc9b9db8":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"HTMLStyleModel","state":{"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"HTMLStyleModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"StyleView","background":null,"description_width":"","font_size":null,"text_color":null}},"b080a35c80d64e88ab33ce49b46c07c9":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"HTMLModel","state":{"_dom_classes":[],"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"HTMLModel","_view_count":null,"_view_module":"@jupyter-widgets/controls","_view_module_version":"2.0.0","_view_name":"HTMLView","description":"","description_allow_html":false,"layout":"IPY_MODEL_6fd6ed0f292a4655aaac1fac4ad2a34d","placeholder":"​","style":"IPY_MODEL_96427a1e02be417da6bc2b51cc9b9db8","tabbable":null,"tooltip":null,"value":" 272/272 [00:00&lt;00:00, 4840.29it/s]"}},"c51596416c2e4b809bb6fe28b587cdd5":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"FloatProgressModel","state":{"_dom_classes":[],"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"FloatProgressModel","_view_count":null,"_view_module":"@jupyter-widgets/controls","_view_module_version":"2.0.0","_view_name":"ProgressView","bar_style":"success","description":"","description_allow_html":false,"layout":"IPY_MODEL_7b768d3fa84947fea75ed474b4654ff3","max":272,"min":0,"orientation":"horizontal","style":"IPY_MODEL_f9d7ebe5f76a4a4f82b2dedf1b85cad9","tabbable":null,"tooltip":null,"value":272}},"f9d7ebe5f76a4a4f82b2dedf1b85cad9":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"ProgressStyleModel","state":{"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"ProgressStyleModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"StyleView","bar_color":null,"description_width":""}}},"version_major":2,"version_minor":0}
+    </script>
+    <script id="quarto-html-after-body" type="application/javascript">
+      window.document.addEventListener("DOMContentLoaded", function (event) {
+        const tabsets =  window.document.querySelectorAll(".panel-tabset-tabby")
+        tabsets.forEach(function(tabset) {
+          const tabby = new Tabby('#' + tabset.id);
+        });
+        const isCodeAnnotation = (el) => {
+          for (const clz of el.classList) {
+            if (clz.startsWith('code-annotation-')) {                     
+              return true;
+            }
+          }
+          return false;
+        }
+        const onCopySuccess = function(e) {
+          // button target
+          const button = e.trigger;
+          // don't keep focus
+          button.blur();
+          // flash "checked"
+          button.classList.add('code-copy-button-checked');
+          var currentTitle = button.getAttribute("title");
+          button.setAttribute("title", "Copied!");
+          let tooltip;
+          if (window.bootstrap) {
+            button.setAttribute("data-bs-toggle", "tooltip");
+            button.setAttribute("data-bs-placement", "left");
+            button.setAttribute("data-bs-title", "Copied!");
+            tooltip = new bootstrap.Tooltip(button, 
+              { trigger: "manual", 
+                customClass: "code-copy-button-tooltip",
+                offset: [0, -8]});
+            tooltip.show();    
+          }
+          setTimeout(function() {
+            if (tooltip) {
+              tooltip.hide();
+              button.removeAttribute("data-bs-title");
+              button.removeAttribute("data-bs-toggle");
+              button.removeAttribute("data-bs-placement");
+            }
+            button.setAttribute("title", currentTitle);
+            button.classList.remove('code-copy-button-checked');
+          }, 1000);
+          // clear code selection
+          e.clearSelection();
+        }
+        const getTextToCopy = function(trigger) {
+          const outerScaffold = trigger.parentElement.cloneNode(true);
+          const codeEl = outerScaffold.querySelector('code');
+          for (const childEl of codeEl.children) {
+            if (isCodeAnnotation(childEl)) {
+              childEl.remove();
+            }
+          }
+          return codeEl.innerText;
+        }
+        const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+          text: getTextToCopy
+        });
+        clipboard.on('success', onCopySuccess);
+        if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+          const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+            text: getTextToCopy,
+            container: window.document.getElementById('quarto-embedded-source-code-modal')
+          });
+          clipboardModal.on('success', onCopySuccess);
+        }
+          var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+          var mailtoRegex = new RegExp(/^mailto:/);
+            var filterRegex = new RegExp('/' + window.location.host + '/');
+          var isInternal = (href) => {
+              return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+          }
+          // Inspect non-navigation links and adorn them if external
+         var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+          for (var i=0; i<links.length; i++) {
+            const link = links[i];
+            if (!isInternal(link.href)) {
+              // undo the damage that might have been done by quarto-nav.js in the case of
+              // links that we want to consider external
+              if (link.dataset.originalHref !== undefined) {
+                link.href = link.dataset.originalHref;
+              }
+            }
+          }
+        function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+          const config = {
+            allowHTML: true,
+            maxWidth: 500,
+            delay: 100,
+            arrow: false,
+            appendTo: function(el) {
+                return el.closest('section.slide') || el.parentElement;
+            },
+            interactive: true,
+            interactiveBorder: 10,
+            theme: 'light-border',
+            placement: 'bottom-start',
+          };
+          if (contentFn) {
+            config.content = contentFn;
+          }
+          if (onTriggerFn) {
+            config.onTrigger = onTriggerFn;
+          }
+          if (onUntriggerFn) {
+            config.onUntrigger = onUntriggerFn;
+          }
+            config['offset'] = [0,0];
+            config['maxWidth'] = 700;
+          window.tippy(el, config); 
+        }
+        const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+        for (var i=0; i<noterefs.length; i++) {
+          const ref = noterefs[i];
+          tippyHover(ref, function() {
+            // use id or data attribute instead here
+            let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+            try { href = new URL(href).hash; } catch {}
+            const id = href.replace(/^#\/?/, "");
+            const note = window.document.getElementById(id);
+            if (note) {
+              return note.innerHTML;
+            } else {
+              return "";
+            }
+          });
+        }
+        const findCites = (el) => {
+          const parentEl = el.parentElement;
+          if (parentEl) {
+            const cites = parentEl.dataset.cites;
+            if (cites) {
+              return {
+                el,
+                cites: cites.split(' ')
+              };
+            } else {
+              return findCites(el.parentElement)
+            }
+          } else {
+            return undefined;
+          }
+        };
+        var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+        for (var i=0; i<bibliorefs.length; i++) {
+          const ref = bibliorefs[i];
+          const citeInfo = findCites(ref);
+          if (citeInfo) {
+            tippyHover(citeInfo.el, function() {
+              var popup = window.document.createElement('div');
+              citeInfo.cites.forEach(function(cite) {
+                var citeDiv = window.document.createElement('div');
+                citeDiv.classList.add('hanging-indent');
+                citeDiv.classList.add('csl-entry');
+                var biblioDiv = window.document.getElementById('ref-' + cite);
+                if (biblioDiv) {
+                  citeDiv.innerHTML = biblioDiv.innerHTML;
+                }
+                popup.appendChild(citeDiv);
+              });
+              return popup.innerHTML;
+            });
+          }
+        }
+      });
+      </script>
+    
+
+</body></html>
