@@ -7,7 +7,6 @@ format:
     embed-resources: true
     theme: moon
     slide-number: true
-    chalkboard: true
     smaller: true
     css: custom.css
     scrollable: true
