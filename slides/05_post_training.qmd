@@ -4,6 +4,7 @@ subtitle: "Part 5: Post-training"
 author: "Nathanaël Fijalkow, <br>CNRS, LaBRI, University of Bordeaux,<br>NukkAI, Paris"
 format:
   revealjs:
+    embed-resources: true
     theme: moon
     slide-number: true
     chalkboard: true
