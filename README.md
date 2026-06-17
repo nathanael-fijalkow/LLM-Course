@@ -1,15 +1,45 @@
-# Large Language Models for Code and Proof
+# Large Language Models
 
-Joint course for [MVA](https://www.master-mva.com/cours/large-language-models-introduction-and-applications-for-code/) (Master Vision Apprentissage) and [IASD](https://dauphine.psl.eu/formations/masters/informatique/m2-intelligence-artificielle-systemes-donnees) (Intelligence Artificielle et Science des Données), Paris.
+The course is offered by the [MVA](https://www.master-mva.com/cours/large-language-models-introduction-and-applications-for-code/) (Master Vision Apprentissage).
 
-Course website: [https://llm.labri.fr/](https://llm.labri.fr/)
+---
 
-## Useful Links
+## Next year (2026 -- 2027, under construction)
 
-- [Hugging Face organization](https://huggingface.co/organizations/LLM-course/share/iYbsSMrWsquCQBKTVIcEOqqQJineJMRGgI)
-- [Official page on the MVA website](https://www.master-mva.com/cours/large-language-models-introduction-and-applications-for-code/)
+New slides built with [Quarto](https://quarto.org/) and new notebooks are being prepared for the next edition of the course.
 
-## Slides
+### Slides
+
+| Topic | Slides |
+|-------|--------|
+| Transformers 101 | [Slides](slides/01_transformers_101.html) |
+<!-- | Advanced Architectures | [Slides](slides/02_advanced_architectures.html) |
+| Tokenization | [Slides](slides/03_tokenization.html) |
+| Pre-training | [Slides](slides/04_pretraining.html) | -->
+| Post-training | [Slides](slides/05_post_training.html) |
+<!-- | Semantic Search | [Slides](slides/06_semantic_search.html) |
+| Function Calling & Agents | [Slides](slides/07_function_calling_agents.html) |
+| Grammar Alignment | [Slides](slides/08_grammar_alignment.html) |
+| Mechanistic Interpretability | [Slides](slides/09_mech_interp_sudoku.html) | -->
+
+### Notebooks
+
+| Topic | Notebook |
+|-------|----------|
+| Transformers 101 | [Notebook](notebooks/01_transformers_101.ipynb) |
+<!-- | Advanced Architectures | [Notebook](notebooks/02_advanced_architectures.ipynb) |
+| Tokenization | [Notebook](notebooks/03_tokenization.ipynb) |
+| Pre-training | [Notebook](notebooks/04_pretraining.ipynb) | -->
+| Post-training | [Notebook](notebooks/05_post_training.ipynb) |
+<!-- | Semantic Search | [Notebook](notebooks/06_semantic_search.ipynb) |
+| Function Calling & Agents | [Notebook](notebooks/07_function_calling_agents.ipynb) |
+| Grammar Alignment | [Notebook](notebooks/08_grammar_alignment.ipynb) | -->
+
+---
+
+## Previous year (2025 -- 2026)
+
+### Slides
 
 | Topic | Slides |
 |-------|--------|
@@ -22,6 +52,21 @@ Course website: [https://llm.labri.fr/](https://llm.labri.fr/)
 | Semantic Search | [Slides](https://docs.google.com/presentation/d/18IDVR9sNHlgmvXzY-8ovx7hIFlqd8NIEd06RWXvu84c/edit?usp=sharing) |
 | Tool Calling & Agents | [Slides](https://docs.google.com/presentation/d/1tHrZY59TpHiOO4sPHdH6FmD5-J3uA3iRUz8pmOnPDlQ/edit?usp=sharing) |
 
+### Notebooks
+
+| Topic | Notebook |
+|-------|----------|
+| Transformers 101 | [Notebook](notebooks/01_transformers_101.ipynb) |
+| Advanced Architectures | [Notebook](notebooks/02_advanced_architectures.ipynb) |
+| Tokenization | [Notebook](notebooks/03_tokenization.ipynb) |
+| Pre-training | [Notebook](notebooks/04_pretraining.ipynb) |
+| Post-training | [Notebook](notebooks/05_post_training.ipynb) |
+| Semantic Search | [Notebook](notebooks/06_semantic_search.ipynb) |
+| Function Calling & Agents | [Notebook](notebooks/07_function_calling_agents.ipynb) |
+| Grammar Alignment | [Notebook](notebooks/08_grammar_alignment.ipynb) |
+
+---
+
 ## Assignments
 
 | Assignment | Instructions | Submission |
@@ -30,8 +75,3 @@ Course website: [https://llm.labri.fr/](https://llm.labri.fr/)
 | Play Chess like a Honey Bee | [Instructions](https://docs.google.com/presentation/d/1EgOUQLXxcifWdSpUHAEWtZJBn-hRKMFjDvlswgQH9us/edit?usp=sharing) | [Submission space](https://huggingface.co/spaces/LLM-course/Chess1MChallenge) | |
 | Playing Zork has never been so boring | [Instructions](https://docs.google.com/presentation/d/1esLis81JjvyhFks-LpLShcXnAiO3OSa64jd77KtE_uU/edit?usp=sharing) | [Submission space](https://huggingface.co/spaces/LLM-course/Chess1MChallenge) | |
 | Codenames | | [Submission space](https://huggingface.co/spaces/LLM-course/codenames) | |
-
-## Teachers
-
-- **Nathanaël Fijalkow** — [webpage](http://games-automata-play.com/)
-- **Marc Lelarge** — [webpage](https://www.di.ens.fr/~lelarge/)
