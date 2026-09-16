@@ -1,0 +1,30 @@
+[project]
+name = "llm-mva"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "torch",
+    "transformers",
+    "tiktoken",
+    "tokenizers",
+    "datasets",
+    "trl",
+    "peft",
+    "sentence-transformers",
+    "faiss-cpu",
+    "pydantic",
+    "dotenv",
+    "jinja2",
+    "huggingface-hub",
+    "python-dotenv",
+    "langchain",
+    "mcp",
+    "matplotlib",
+    "numpy",
+    "jupyter",
+    "nbformat",
+    "plotly>=6.8.0",
+    "jax>=0.10.1",
+    "orbax>=0.1.9",
+    "flax>=0.12.7",
+]

@@ -14,12 +14,12 @@ New slides built with [Quarto](https://quarto.org/) and new notebooks are being 
 |-------|--------|
 | Transformers 101 | [Slides](slides/01_transformers_101.html) |
 | Post-training | [Slides](slides/05_post_training.html) |
+| Function Calling & Agents | [Slides](slides/07_function_calling_agents.html) |
 
 <!-- | Advanced Architectures | [Slides](slides/02_advanced_architectures.html) |
 | Tokenization | [Slides](slides/03_tokenization.html) |
 | Pre-training | [Slides](slides/04_pretraining.html) | -->
 <!-- | Semantic Search | [Slides](slides/06_semantic_search.html) |
-| Function Calling & Agents | [Slides](slides/07_function_calling_agents.html) |
 | Grammar Alignment | [Slides](slides/08_grammar_alignment.html) |
 | Mechanistic Interpretability | [Slides](slides/09_mech_interp_sudoku.html) | -->
 
@@ -29,12 +29,12 @@ New slides built with [Quarto](https://quarto.org/) and new notebooks are being 
 |-------|----------|
 | Transformers 101 | [Notebook](notebooks/01_transformers_101.ipynb) |
 | Post-training | [Notebook](notebooks/05_post_training.ipynb) |
+| Function Calling & Agents | [Notebook](notebooks/07_function_calling_agents.ipynb) |
 
 <!-- | Advanced Architectures | [Notebook](notebooks/02_advanced_architectures.ipynb) |
 | Tokenization | [Notebook](notebooks/03_tokenization.ipynb) |
 | Pre-training | [Notebook](notebooks/04_pretraining.ipynb) | -->
 <!-- | Semantic Search | [Notebook](notebooks/06_semantic_search.ipynb) |
-| Function Calling & Agents | [Notebook](notebooks/07_function_calling_agents.ipynb) |
 | Grammar Alignment | [Notebook](notebooks/08_grammar_alignment.ipynb) | -->
 
 ---
@@ -54,7 +54,8 @@ New slides built with [Quarto](https://quarto.org/) and new notebooks are being 
 | Semantic Search | [Slides](https://docs.google.com/presentation/d/18IDVR9sNHlgmvXzY-8ovx7hIFlqd8NIEd06RWXvu84c/edit?usp=sharing) |
 | Tool Calling & Agents | [Slides](https://docs.google.com/presentation/d/1tHrZY59TpHiOO4sPHdH6FmD5-J3uA3iRUz8pmOnPDlQ/edit?usp=sharing) |
 
-### Notebooks
+
+<!-- ### Notebooks
 
 | Topic | Notebook |
 |-------|----------|
@@ -65,7 +66,7 @@ New slides built with [Quarto](https://quarto.org/) and new notebooks are being 
 | Post-training | [Notebook](notebooks/05_post_training.ipynb) |
 | Semantic Search | [Notebook](notebooks/06_semantic_search.ipynb) |
 | Function Calling & Agents | [Notebook](notebooks/07_function_calling_agents.ipynb) |
-| Grammar Alignment | [Notebook](notebooks/08_grammar_alignment.ipynb) |
+| Grammar Alignment | [Notebook](notebooks/08_grammar_alignment.ipynb) | -->
 
 ---
 
