@@ -1304,7 +1304,7 @@ Nathanaël Fijalkow, <br>CNRS, LaBRI, University of Bordeaux,<br>NukkAI, Paris
 <section id="tool-schema-pydantic" class="slide level2 center">
 <h2>Tool schema: Pydantic</h2>
 <!-- type: example -->
-<div id="126eddb4" class="cell" data-execution_count="1">
+<div id="a9d18ba9" class="cell" data-execution_count="1">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href></a><span class="im">from</span> pydantic <span class="im">import</span> BaseModel, Field</span>
@@ -1945,8 +1945,8 @@ Nathanaël Fijalkow, <br>CNRS, LaBRI, University of Bordeaux,<br>NukkAI, Paris
 <h1>Part 5: Frameworks and Packages</h1>
 <!-- type: content -->
 </section>
-<section id="the-2026-ecosystem-choose-the-layer" class="slide level2 center">
-<h2>The 2026 ecosystem: choose the layer</h2>
+<section id="the-2026-ecosystem-model-and-agent-layers" class="slide level2 center">
+<h2>The 2026 ecosystem: model and agent layers</h2>
 <!-- type: content -->
 <table class="caption-top">
 <colgroup>
@@ -1972,6 +1972,26 @@ Nathanaël Fijalkow, <br>CNRS, LaBRI, University of Bordeaux,<br>NukkAI, Paris
 <td>LangChain <code>create_agent</code>, OpenAI Agents SDK</td>
 <td>Tools, prompts, loops, guardrails</td>
 </tr>
+</tbody>
+</table>
+</section>
+<section id="the-2026-ecosystem-orchestration-and-integration" class="slide level2 center">
+<h2>The 2026 ecosystem: orchestration and integration</h2>
+<!-- type: content -->
+<table class="caption-top">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Layer</th>
+<th>Common choices</th>
+<th>Main job</th>
+</tr>
+</thead>
+<tbody>
 <tr class="odd">
 <td>Orchestration runtime</td>
 <td>LangGraph, custom state machines</td>
@@ -2019,7 +2039,6 @@ Nathanaël Fijalkow, <br>CNRS, LaBRI, University of Bordeaux,<br>NukkAI, Paris
 <span id="cb25-13"><a href></a>result <span class="op">=</span> agent.invoke({</span>
 <span id="cb25-14"><a href></a>    <span class="st">&quot;messages&quot;</span>: [{<span class="st">&quot;role&quot;</span>: <span class="st">&quot;user&quot;</span>, <span class="st">&quot;content&quot;</span>: <span class="st">&quot;Where can I go?&quot;</span>}]</span>
 <span id="cb25-15"><a href></a>})</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>The framework runs the model/tool loop. The application still owns permissions and side effects.</p>
 </section>
 <section id="langgraph-explicit-orchestration" class="slide level2 center">
 <h2>LangGraph: explicit orchestration</h2>
@@ -2050,7 +2069,6 @@ Nathanaël Fijalkow, <br>CNRS, LaBRI, University of Bordeaux,<br>NukkAI, Paris
 <li>Use it when the runtime should manage turns, tools, sessions, and tracing.</li>
 <li>Use a lower-level API when you need to own the loop and state yourself.</li>
 </ul>
-<p>All of these packages still require authorization, validation, evaluation, and an explicit side-effect policy.</p>
 </section>
 <section id="transformers-model-infrastructure" class="slide level2 center">
 <h2>Transformers: model infrastructure</h2>
@@ -2475,53 +2493,6 @@ Nathanaël Fijalkow, <br>CNRS, LaBRI, University of Bordeaux,<br>NukkAI, Paris
 <li>Which scenarios prove task success and safety?</li>
 <li>Can an operator reconstruct the trace of a bad decision?</li>
 </ol>
-</section>
-<section id="summary" class="slide level2 center">
-<h2>Summary</h2>
-<!-- type: content -->
-<table class="caption-top">
-<colgroup>
-<col style="width: 50%">
-<col style="width: 50%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Concept</th>
-<th>Purpose</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>Tool schemas</td>
-<td>Describe and validate possible actions</td>
-</tr>
-<tr class="even">
-<td>Agent loop</td>
-<td>Iterate over perception, action, and observation</td>
-</tr>
-<tr class="odd">
-<td>Context engineering</td>
-<td>Manage state within a finite context budget</td>
-</tr>
-<tr class="even">
-<td>Sandboxing and policy</td>
-<td>Limit the consequences of model mistakes</td>
-</tr>
-<tr class="odd">
-<td>Evaluation and tracing</td>
-<td>Measure system reliability and diagnose failures</td>
-</tr>
-<tr class="even">
-<td>Orchestration</td>
-<td>Combine deterministic control and specialized delegation</td>
-</tr>
-<tr class="odd">
-<td>MCP</td>
-<td>Standardize integration of context and capabilities</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Next</strong>: Grammar Alignment, constraining LLM outputs to follow formal grammars.</p>
 
 </section></section>
     </div>

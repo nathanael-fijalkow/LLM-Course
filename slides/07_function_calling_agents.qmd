@@ -729,13 +729,19 @@ Start with one well-instrumented agent. Add a specialist only when its tools, co
 # Part 5: Frameworks and Packages
 <!-- type: content -->
 
-## The 2026 ecosystem: choose the layer
+## The 2026 ecosystem: model and agent layers
 <!-- type: content -->
 
 | Layer | Common choices | Main job |
 |---|---|---|
 | Model and inference | `transformers`, `huggingface_hub.InferenceClient`, provider SDKs | Load or call a model |
 | Agent harness | LangChain `create_agent`, OpenAI Agents SDK | Tools, prompts, loops, guardrails |
+
+## The 2026 ecosystem: orchestration and integration
+<!-- type: content -->
+
+| Layer | Common choices | Main job |
+|---|---|---|
 | Orchestration runtime | LangGraph, custom state machines | Durable state, branching, retries, human approval |
 | Multi-agent workflow | CrewAI, handoffs in provider SDKs | Delegation and role-based processes |
 | Interoperability | MCP SDKs and MCP clients | Discover and call external capabilities |
@@ -772,8 +778,6 @@ result = agent.invoke({
 })
 ```
 
-The framework runs the model/tool loop. The application still owns permissions and side effects.
-
 ## LangGraph: explicit orchestration
 <!-- type: content -->
 
@@ -797,8 +801,6 @@ The framework runs the model/tool loop. The application still owns permissions a
 - Includes MCP server tool calling and sandbox-agent support in the current documentation.
 - Use it when the runtime should manage turns, tools, sessions, and tracing.
 - Use a lower-level API when you need to own the loop and state yourself.
-
-All of these packages still require authorization, validation, evaluation, and an explicit side-effect policy.
 
 ## Transformers: model infrastructure
 <!-- type: content -->
@@ -1216,18 +1218,3 @@ Before deploying an agent, ask:
 3. How are failures, retries, and cancellation represented?
 4. Which scenarios prove task success and safety?
 5. Can an operator reconstruct the trace of a bad decision?
-
-## Summary
-<!-- type: content -->
-
-| Concept | Purpose |
-|---|---|
-| Tool schemas | Describe and validate possible actions |
-| Agent loop | Iterate over perception, action, and observation |
-| Context engineering | Manage state within a finite context budget |
-| Sandboxing and policy | Limit the consequences of model mistakes |
-| Evaluation and tracing | Measure system reliability and diagnose failures |
-| Orchestration | Combine deterministic control and specialized delegation |
-| MCP | Standardize integration of context and capabilities |
-
-**Next**: Grammar Alignment, constraining LLM outputs to follow formal grammars.
