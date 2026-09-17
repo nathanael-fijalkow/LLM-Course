@@ -28,6 +28,26 @@ format:
 5. Frameworks and packages
 6. Model Context Protocol (MCP)
 
+## Terminology
+<!-- type: content -->
+
+- **Model**: decides the next step from observations and instructions.
+- **Tools**: define the valid actions and their arguments.
+- **Runtime**: validates tool calls, executes them, and stores state.
+- **Observation**: the tool result is fed back into the next model call.
+- **Policy**: approvals, retries, limits, and safety checks stay outside the model.
+
+## What not to do
+<!-- type: content -->
+
+- Trust model-generated arguments without validation.
+- Treat chat history as durable memory.
+- Repeat mutating actions without idempotency or approval.
+- Let tool output redefine system instructions or permissions.
+- Benchmark only the model, not the full agent system.
+
+Goal: design a reliable control loop.
+
 # The running example: Zork
 <!-- type: content -->
 
@@ -324,6 +344,33 @@ Basic function calling has four limitations:
 - It may act without a long-term plan.
 - Hard-coded integrations do not transfer between environments.
 
+## Minimal viable agent
+<!-- type: content -->
+
+A production-ready agent can be surprisingly small:
+
+1. Keep a message history and task state.
+2. Call the model with a tool list and policy.
+3. Validate each tool call before execution.
+4. Execute the tool in a controlled environment.
+5. Feed the result back and continue until the task completes or a stop condition is reached.
+
+## Minimal viable agent: code
+<!-- type: content -->
+
+```python
+while not done and steps < max_steps:
+    response = llm.chat(messages, tools=tools)
+    for call in response.tool_calls:
+        validated = validate(call)
+        result = execute(validated)
+        messages.extend(as_tool_messages(result))
+    done = response.text is not None and no_tool_calls
+    steps += 1
+```
+
+This is the minimal control loop. Everything else is policy, memory, or orchestration.
+
 # Part 2: Agent Loops and State
 <!-- type: content -->
 
@@ -450,12 +497,14 @@ The agent must select, compress, and retain information deliberately. This is **
 ## Working state versus durable memory
 <!-- type: content -->
 
+The loop runtime must distinguish at least four kinds of state:
+
 - **Working state**: current task, recent observations, pending approvals.
 - **Episodic memory**: summaries of previous runs and outcomes.
 - **Semantic memory**: durable facts, retrieved when relevant.
-- **Artifacts**: files, code, plans, and checkpoints owned outside the prompt.
+- **Artifacts**: files, code, plans, and checkpoints outside the prompt.
 
-Do not treat the chat history as memory.
+Do not treat the chat history as memory. The runtime owns state explicitly.
 
 ## Compact the history
 <!-- type: example -->
@@ -729,19 +778,13 @@ Start with one well-instrumented agent. Add a specialist only when its tools, co
 # Part 5: Frameworks and Packages
 <!-- type: content -->
 
-## The 2026 ecosystem: model and agent layers
+## The 2026 ecosystem
 <!-- type: content -->
 
 | Layer | Common choices | Main job |
 |---|---|---|
 | Model and inference | `transformers`, `huggingface_hub.InferenceClient`, provider SDKs | Load or call a model |
 | Agent harness | LangChain `create_agent`, OpenAI Agents SDK | Tools, prompts, loops, guardrails |
-
-## The 2026 ecosystem: orchestration and integration
-<!-- type: content -->
-
-| Layer | Common choices | Main job |
-|---|---|---|
 | Orchestration runtime | LangGraph, custom state machines | Durable state, branching, retries, human approval |
 | Multi-agent workflow | CrewAI, handoffs in provider SDKs | Delegation and role-based processes |
 | Interoperability | MCP SDKs and MCP clients | Discover and call external capabilities |
