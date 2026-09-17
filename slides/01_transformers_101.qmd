@@ -497,28 +497,15 @@ $$z_i = \sum_j \text{softmax}(\alpha)_{i,j} \cdot v_j$$
 Intuitively, $z_i$ is a weighted average of the value vectors, where the weights are given by the attention scores.
 
 ## Why scaling by square root?
-<!-- type: example -->
+<!-- type: content -->
 
-If $q$ and $k$ are random vectors with variance 1, then their dot product has variance $d_k$. This can lead to very large values for $\alpha_{i,j}$, where softmax behaves like a step function:
+If $q$ and $k$ are random vectors, the dot product grows roughly like $d_k$.
 
-```{python}
-import math
+So the raw attention scores can become very large and the softmax saturates:
 
-# Demonstrate softmax sensitivity to scale
-d_k = 64
-q = torch.randn(1, d_k)
-k = torch.randn(5, d_k)
+$$\alpha_{i,j} = \frac{q_i \cdot k_j}{\sqrt{d_k}}$$
 
-raw_scores = q @ k.T
-scaled_scores = raw_scores / math.sqrt(d_k)
-
-print(f"Raw scores std: {raw_scores.std():.2f}")
-print(f"Scaled scores std: {scaled_scores.std():.2f}")
-print(f"Softmax(raw):    {F.softmax(raw_scores, dim=-1).numpy().round(3)}")
-print(f"Softmax(scaled): {F.softmax(scaled_scores, dim=-1).numpy().round(3)}")
-```
-
-Dividing by $\sqrt{d_k}$ keeps the variance of the scores around 1, which helps with training stability.
+Dividing by $\sqrt{d_k}$ keeps the score scale roughly constant, which makes softmax smoother and training more stable.
 
 ## Computing the query, key, and value vectors
 <!-- type: content -->
@@ -535,23 +522,20 @@ In other words, we have three matrices $W_q$, $W_k$, and $W_v$ that project the 
 
 ```python
 class SelfAttentionHead(nn.Module):
-    def __init__(self, input_dim, head_dim):
+    def __init__(self, d_in, d_head):
         super().__init__()
-        self.W_q = nn.Linear(input_dim, head_dim, bias=False)
-        self.W_k = nn.Linear(input_dim, head_dim, bias=False)
-        self.W_v = nn.Linear(input_dim, head_dim, bias=False)
-        self.scale = head_dim ** 0.5
+        self.W_q = nn.Linear(d_in, d_head, bias=False)
+        self.W_k = nn.Linear(d_in, d_head, bias=False)
+        self.W_v = nn.Linear(d_in, d_head, bias=False)
+        self.scale = d_head ** 0.5
 
     def forward(self, x, mask=None):
-        # x: (batch, seq_len, input_dim)
-        Q = self.W_q(x)  # (batch, seq_len, head_dim)
-        K = self.W_k(x)  # (batch, seq_len, head_dim)
-        V = self.W_v(x)  # (batch, seq_len, head_dim)
-        # Attention scores: (batch, seq_len, seq_len)
+        Q = self.W_q(x)
+        K = self.W_k(x)
+        V = self.W_v(x)
         scores = (Q @ K.transpose(-2, -1)) / self.scale
         weights = F.softmax(scores, dim=-1)
-        context = weights @ V  # (batch, seq_len, head_dim)
-        return context, weights
+        return weights @ V
 ```
 
 ## Two important remarks
@@ -769,26 +753,31 @@ A useful mental model: the residual connections form a **residual stream** runni
 # 6. The Decoder Transformer {#6-decoder-transformer}
 <!-- type: content -->
 
+A decoder-only Transformer is just:
+
+1. token embeddings + positional embeddings,
+2. repeated Transformer blocks,
+3. a causal mask,
+4. a final output head for next-token prediction.
+
+## Implementation
+
 ```python
 class DecoderTransformer(nn.Module):
-    def __init__(self, vocab_size, embed_dim, num_heads, num_layers, context_length):
+    def __init__(self, vocab_size, embed_dim, n_layers, n_heads):
         super().__init__()
         self.token_emb = nn.Embedding(vocab_size, embed_dim)
-        self.pos_emb = nn.Embedding(context_length, embed_dim)
-        self.blocks = nn.ModuleList(
-            [TransformerBlock(embed_dim, num_heads) for _ in range(num_layers)]
-        )
-        self.ln_final = nn.LayerNorm(embed_dim)
+        self.pos_emb = nn.Embedding(4096, embed_dim)
+        self.blocks = nn.ModuleList([TransformerBlock(embed_dim, n_heads) for _ in range(n_layers)])
         self.head = nn.Linear(embed_dim, vocab_size, bias=False)
-        self.context_length = context_length
 
     def forward(self, input_ids):
         T = input_ids.shape[1]
-        mask = torch.tril(torch.ones(T, T))                    # causal mask
         x = self.token_emb(input_ids) + self.pos_emb(torch.arange(T))
+        mask = torch.tril(torch.ones(T, T))
         for block in self.blocks:
             x = block(x, mask=mask)
-        return self.head(self.ln_final(x))                     # (batch, T, vocab_size)
+        return self.head(x)
 ```
 
 ## Positional embeddings
@@ -815,25 +804,15 @@ The original Transformer used fixed sinusoidal positional embeddings, but modern
 Unlike learned positional embeddings, RoPE encodes position information directly into the attention mechanism, allowing it to extrapolate to sequence lengths longer than those seen during training.
 
 ## Sliding windows
-<!-- type: example -->
+<!-- type: content -->
 
-At every position $t$ the output predicts token $t+1$. A single sequence of $c$ tokens therefore yields $c$ predictions.
+At each position, the model predicts the next token using the preceding context.
 
-Let's look at the top predictions of GPT-2 at each position:
+So a length-$T$ sequence gives $T$ next-token predictions, each conditioned on a different sliding window of past tokens.
 
-```{python}
-from transformers import GPT2LMHeadModel
+. . .
 
-gpt2_lm = GPT2LMHeadModel.from_pretrained("gpt2").eval()
-
-tokens = enc.encode("The cat sat on")
-with torch.no_grad():
-    logits = gpt2_lm(torch.tensor([tokens])).logits      # (1, seq_len, vocab)
-
-for i, t in enumerate(tokens):
-    top = torch.topk(logits[0, i], 3).indices
-    print(f"{enc.decode([t])!r:8} -> {[enc.decode([j.item()]) for j in top]}")
-```
+The key point is simple: **the model reads a context window, predicts the next token, then shifts one step forward.**
 
 # 7. Autoregressive Generation {#7-autoregressive-generation}
 <!-- type: content -->
@@ -846,9 +825,13 @@ To generate text we repeat four steps:
 4. Append it, and repeat
 
 ## Example
+<!-- type: content -->
 
 ```{python}
 #| echo: true
+from transformers import GPT2LMHeadModel
+gpt2_lm = GPT2LMHeadModel.from_pretrained("gpt2").eval()
+
 @torch.no_grad()
 def generate(model, input_ids, max_new_tokens=20):
     context_length = model.config.n_positions
@@ -873,32 +856,26 @@ Three knobs reshape the distribution **before** sampling:
 - **Top-p** (nucleus): keep the smallest set of tokens whose cumulative probability exceeds $p$.
 
 ## Sampling with temperature, top-k, and top-p
+<!-- type: content -->
 
-```{python}
-#| echo: true
-@torch.no_grad()
-def sample(model, input_ids, max_new_tokens=50, temperature=1.0, top_k=None, top_p=None):
-    for _ in range(max_new_tokens):
-        logits = model(input_ids[:, -model.config.n_positions:]).logits[:, -1, :] / temperature
+These are three ways to reshape the next-token distribution before sampling:
 
-        if top_k is not None:                          # keep the k highest logits
-            kth = torch.topk(logits, top_k).values[:, -1:]
-            logits = logits.masked_fill(logits < kth, float("-inf"))
+- **Temperature**: sharpens or flattens logits.
+- **Top-k**: keep only the $k$ most likely tokens.
+- **Top-p**: keep the smallest set whose cumulative probability exceeds $p$.
 
-        if top_p is not None:                          # keep the smallest nucleus with mass > p
-            s_logits, s_idx = torch.sort(logits, descending=True)
-            probs = F.softmax(s_logits, dim=-1)
-            remove = probs.cumsum(dim=-1) - probs > top_p   # prefix mass already exceeds p
-            logits = logits.masked_fill(remove.scatter(-1, s_idx, remove), float("-inf"))
+## Minimal implementation
+<!-- type: content -->
 
-        probs = F.softmax(logits, dim=-1)
-        input_ids = torch.cat([input_ids, torch.multinomial(probs, 1)], dim=1)
-    return input_ids
-
-prompt = torch.tensor([enc.encode("The meaning of life is")])
-out = sample(gpt2_lm, prompt, temperature=0.8, top_k=50, top_p=0.9)
-print(enc.decode(out[0].tolist()))
+```python
+logits = model(...).logits[:, -1, :] / temperature
+logits = top_k_filter(logits, k)
+logits = top_p_filter(logits, p)
+probs = torch.softmax(logits, dim=-1)
+next_token = torch.multinomial(probs, 1)
 ```
+
+These knobs let us trade off **creativity** against **coherence**.
 
 # 8. Using Hugging Face Models {#8-hugging-face}
 <!-- type: content -->
@@ -922,8 +899,6 @@ These are just the **weights**. Add ~1.2× for inference (plus a KV cache that g
 
 ## The pipeline API
 <!-- type: example -->
-
-The quickest path: one call, little control.
 
 ```{python}
 from transformers import pipeline

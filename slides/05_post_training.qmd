@@ -357,16 +357,19 @@ Here, $\text{KL}[\pi_\theta(\cdot|x) \| \pi_\text{ref}(\cdot|x)]$ measures how f
 ## The KL penalty in practice
 <!-- type: content -->
 
-The full KL divergence $\text{KL}[\pi_\theta(\cdot|x) \| \pi_\text{ref}(\cdot|x)]$ sums over **all possible responses**: intractable for a large vocabulary.
+The full KL is over all possible responses, so it is not computed exactly.
 
-**Token-level approximation.** Since both models are autoregressive:
-$$\pi(y \mid x) = \prod_{t=1}^T \pi(y_t \mid y_{<t}, x)$$
+Instead, we estimate it on the sampled response $y = (y_1, \ldots, y_T)$:
 
-the log-ratio of the policy to the reference **along a sampled response** $y = (y_1, \ldots, y_T)$ factorises into a sum:
+$$
+\log \frac{\pi_\theta(y \mid x)}{\pi_\text{ref}(y \mid x)}
+= \sum_{t=1}^{T}
+\log \frac{\pi_\theta(y_t \mid y_{<t}, x)}{\pi_\text{ref}(y_t \mid y_{<t}, x)}
+$$
 
-$$\log \frac{\pi_\theta(y \mid x)}{\pi_\text{ref}(y \mid x)} = \sum_{t=1}^{T} \log \frac{\pi_\theta(y_t \mid y_{<t}, x)}{\pi_\text{ref}(y_t \mid y_{<t}, x)}$$
+. . .
 
-This is a **per-token difference of log-probabilities**: cheap to compute by running both models on the same sequence.
+This is just the sum of **per-token log-probability differences**. It is cheap to compute while keeping the policy close to the reference model and preventing reward hacking.
 
 ## Issues with RLHF
 <!-- type: content -->
@@ -378,7 +381,7 @@ PPO requires **four models** in memory simultaneously:
 3. **Reference model**: frozen copy of the original SFT model
 4. **Reward model**: evaluates quality
 
-For a 70B model, this is ~4 × 140 GB ≈ 560 GB of GPU memory. Extremely expensive.
+For a 70B model, this is ~4 × 140 GB ≈ 560 GB of GPU memory. 
 
 ## Reward hacking
 <!-- type: content -->
@@ -450,21 +453,31 @@ Inspired by *Prospect Theory* (Kahneman & Tversky):
 ## KTO loss
 <!-- type: content -->
 
-The KTO objective compares each completion to a *reference level* $z_\text{ref}$ (the average log-ratio):
+KTO uses a single score relative to a reference baseline:
 
-$$\begin{array}{lll}
-\mathcal{L}_{\text{KTO}} & = & \lambda_D \cdot \mathbb{E}_{\text{good}} \left[1 - \sigma\!\left(\beta(\log\frac{\pi_\theta(y|x)}{\pi_\text{ref}(y|x)} - z_\text{ref})\right)\right] \\[0.5em]
-& + & \lambda_U \cdot \mathbb{E}_{\text{bad}} \left[1 - \sigma\!\left(-\beta(\log\frac{\pi_\theta(y|x)}{\pi_\text{ref}(y|x)} - z_\text{ref})\right)\right]
-\end{array}$$
+$$s(x,y) = \log \frac{\pi_\theta(y\mid x)}{\pi_\text{ref}(y\mid x)} - z_\text{ref}$$
 
-Good outputs are rewarded when above average; bad outputs are penalized when above average.
+where $z_\text{ref}$ is the batch-average log-ratio.
+
+Then the loss is:
+
+$$
+\mathcal{L}_{\text{KTO}}
+= \lambda_D \, \mathbb{E}_{\text{good}}\left[1 - \sigma(\beta s(x,y))\right]
++ \lambda_U \, \mathbb{E}_{\text{bad}}\left[1 - \sigma(-\beta s(x,y))\right]
+$$
 
 . . .
 
-**How is $z_\text{ref}$ computed?** It is estimated per mini-batch as the mean log-ratio over *other* examples in the batch:
-$$z_\text{ref} = \mathbb{E}_{(x',y') \sim \mathcal{D}}\!\left[\log \frac{\pi_\theta(y' \mid x')}{\pi_\text{ref}(y' \mid x')}\right]$$
+Good outputs are rewarded when they are above the reference baseline; bad outputs are penalized when they are above that baseline.
 
-This measures the *average* policy deviation from the reference model.
+## KTO intuition
+<!-- type: content -->
+
+- No pairwise comparison is required.
+- Each example is labeled only as **good** or **bad**.
+- The model is trained to move good completions up and bad completions down relative to the reference model.
+- This is especially useful when preferences are noisy or hard to pair.
 
 # 6. GRPO and Reasoning Models
 <!-- type: content -->
@@ -548,17 +561,29 @@ Full fine-tuning updates **all** parameters. For a 70B model:
 - Adam optimizer states: another ~280 GB
 - **Total: ~560 GB**
 
-## LoRA (Low-Rank Adaptation)
+## LoRA: target matrices and delta weights
+<!-- type: content -->
 
-<u>The idea</u>. Learn an **adapter**: a small set of additional parameters that are **added** to the foundational model. The foundational model weights are kept **frozen** (never updated); only the adapter is trained.
+For a matrix we want to adapt, such as a transformer weight $W \in \mathbb{R}^{d \times d}$, we keep the base model frozen and add a correction term:
+
+$$W' = W + \Delta W$$
+
+The original weights stay fixed. We only learn the small update $\Delta W$.
 
 . . .
 
-Instead of learning $\Delta W \in \mathbb{R}^{d \times d}$, decompose the adapter:
+This is the key idea of LoRA: **adapt a subset of matrices**, not the whole model.
+
+## LoRA (Low-Rank Adaptation)
+<!-- type: content -->
+
+Instead of learning a dense update $\Delta W \in \mathbb{R}^{d \times d}$ directly, we factorize it as a low-rank product:
 
 $$\Delta W = B A, \quad B \in \mathbb{R}^{d \times r},\ A \in \mathbb{R}^{r \times d}, \quad r \ll d$$
 
 Trainable parameters: $2dr$ instead of $d^2$.
+
+. . .
 
 After training, the adapter can be **merged** back into the base weights ($W \leftarrow W + \Delta W$) at zero inference cost, or kept separate for easy swapping.
 
