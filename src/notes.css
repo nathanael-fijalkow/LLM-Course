@@ -1,0 +1,24 @@
+/* Lecture notes: the html format of one-source decks (see formats.lua) */
+
+/* The animation player is sized in em for the large slide font: give it a readable size in the notes */
+.anim-bar { font-size: 0.85rem !important; }
+.anim-caption { font-size: 0.95rem !important; }
+
+/* Interview questions: ## Interview: ... {.interview} (see formats.lua) */
+section.interview {
+  border-left: 4px solid #cb4b16;
+  border-radius: 0 6px 6px 0;
+  background: rgba(203, 75, 22, 0.08);
+  padding: 0.6rem 1.2rem 0.4rem;
+  margin: 2rem 0;
+}
+section.interview > h2 {
+  color: #cb4b16;
+  margin-top: 0.4rem;
+}
+details.interview-answer > summary {
+  color: #cb4b16;
+  font-weight: bold;
+  cursor: pointer;
+  margin-bottom: 0.8rem;
+}

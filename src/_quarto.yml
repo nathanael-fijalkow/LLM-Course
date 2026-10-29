@@ -1,0 +1,12 @@
+# The decks are single files; this project only exists to move their outputs
+# (slides, lecture notes, notebook; see formats.lua) to their folders.
+project:
+  type: default
+  post-render: _post_render.py
+
+# Used by formats.lua to link the slides, the lecture notes and the notebook.
+course-repo: nathanael-fijalkow/LLM-Course
+# Where the notebooks find the slides and the lecture notes: the GitHub Pages
+# site, since a notebook opened on GitHub or in Colab cannot follow a relative
+# link (use ../ to link a clone of the repository instead).
+site-url: https://nathanael-fijalkow.github.io/LLM-Course/

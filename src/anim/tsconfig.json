@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "target": "ES2019",
+    "lib": ["ES2019", "DOM"],
+    "module": "none",
+    "outFile": "anim.js",
+    "strict": true,
+    "noUnusedLocals": true,
+    "removeComments": false
+  },
+  "files": ["src/player.ts", "src/hnsw.ts", "src/lsh.ts", "src/ivf.ts", "src/pq.ts", "src/wm.ts", "src/kgw.ts", "src/race.ts", "src/gumbel.ts", "src/synthid.ts", "src/residual.ts", "src/main.ts"]
+}

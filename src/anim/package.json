@@ -1,0 +1,11 @@
+{
+  "name": "llm-course-animations",
+  "private": true,
+  "description": "Animations of the slides (IVF, PQ, LSH with random projections, HNSW search, red/green list watermark, residual stream of the Sudoku transformer). The traces are computed in Python when the deck is rendered (the Sudoku forward pass is cached in src/sudoku/); this player only draws them.",
+  "scripts": {
+    "build": "tsc -p ."
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}
