@@ -16,9 +16,6 @@ Each lecture comes as slides, lecture notes (the slides with the explanations gi
 |-------|--------|---------------|----------|
 | Perspectives on generative AI | [Slides](slides/00_perspectives.html) | none | none (no lab) |
 | Transformers 101 | [Slides](slides/01_transformers_101.html) | [Lecture notes](notes/01_transformers_101.html) | [Notebook](notebooks/01_transformers_101.ipynb) |
-| Post-training | [Slides](slides/05_post_training.html) | [Lecture notes](notes/05_post_training.html) | [Notebook](notebooks/05_post_training.ipynb) |
-| Function Calling & Agents | [Slides](slides/07_function_calling_agents.html) | [Lecture notes](notes/07_function_calling_agents.html) | [Notebook](notebooks/07_function_calling_agents.ipynb) |
-
 
 
 ## Repository layout
