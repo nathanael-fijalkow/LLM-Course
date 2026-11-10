@@ -8,14 +8,22 @@ A related course is offered for the second semester in 2026 -- 2027 by [Marc Lel
 
 ---
 
-Material for 2026 -- 2027 is under preparation, please come back later. In the meantime, you can check preliminary slides and notebooks:
+## Sessions
 
-Each lecture comes as slides, lecture notes (the slides with the explanations given in class and the lab with its results) and a notebook (the lab, ready to run).
+The sessions alternate between the two teachers: David stands for David Louapre and Nath for Nathanaël Fijalkow. The material of each session is added here once it has taken place.
 
-| Topic | Slides | Lecture notes | Notebook |
-|-------|--------|---------------|----------|
-| Perspectives on generative AI | [Slides](slides/00_perspectives.html) | none | none (no lab) |
-| Transformers 101 | [Slides](slides/01_transformers_101.html) | [Lecture notes](notes/01_transformers_101.html) | [Notebook](notebooks/01_transformers_101.ipynb) |
+David's lectures come as slides in PDF. Nath's lectures come as slides, lecture notes (the slides with the explanations given in class and the lab with its results) and a notebook (the lab, ready to run).
+
+| Session | Date | Teacher | Topic | Material |
+|---------|------|---------|-------|----------|
+| 1 | October 1 | David | Language models | [Slides (PDF)](david/lecture01.pdf), [Hugging Face Space: NLP before LLMs](https://huggingface.co/spaces/dlouapre/nlp-before-llms) |
+| 2 | October 29 | Nath | Transformers | [Slides: perspectives on generative AI](slides/00_perspectives.html), [Slides: Transformers 101](slides/01_transformers_101.html), [Lecture notes](notes/01_transformers_101.html), [Notebook](notebooks/01_transformers_101.ipynb) |
+| 3 | November 5 | David | Pre-training and scaling laws | [Slides, part 1 (PDF)](david/lecture03_part1.pdf), [Slides, part 2 (PDF)](david/lecture03_part2.pdf) |
+| 4 | November 12 | Nath | Post-training and alignment | [Slides](slides/05_post_training.html), [Lecture notes](notes/05_post_training.html), [Notebook](notebooks/05_post_training.ipynb) |
+| 5 | November 19 | David | Decoding and inference optimization | |
+| 6 | November 26 | Nath | Advanced architectures | |
+| 7 | December 3 | David | Agents | |
+| 8 | December 10 | Nath | Advanced topics | |
 
 
 ## Repository layout
