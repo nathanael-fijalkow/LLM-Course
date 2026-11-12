@@ -256,7 +256,7 @@ print(prompt)
 
 The model then **continues** from the assistant marker.
 
-## Interview: the assistant that never stops {.interview}
+## Interview: the assistant never stops {.interview}
 <!-- type: interview -->
 
 You fine-tune a base model on conversations formatted with the ChatML template. At inference, the model answers correctly, but then goes on: it writes a new user turn, answers it, and only stops at `max_new_tokens`.
@@ -914,7 +914,7 @@ The baseline $b(x)$ of the previous slide is one number per answer. Since $\log 
 ## Reusing samples: importance sampling
 <!-- type: content -->
 
-Generation is the expensive part: PPO reuses each batch, sampled by $\pi_{\text{old}}$, for several gradient steps. After the first step, the samples no longer come from $\pi_\theta$.
+Generation is the expensive part: PPO reuses each batch for several gradient steps. After the first step, the samples no longer come from $\pi_\theta$ but from $\pi_{\text{old}}$, the policy that **sampled the batch** (not the frozen reference $\pi_\text{ref}$).
 
 . . .
 
@@ -987,7 +987,7 @@ The table goes from rewards that are cheap to query but expensive to build (a re
 # 4. Rewards Learned from Preferences
 <!-- type: content -->
 
-RLHF, the recipe of InstructGPT ([Ouyang et al., 2022](https://www.alphaxiv.org/abs/2203.02155)) and ChatGPT, in three steps:
+RLHF, the recipe of InstructGPT ([Ouyang et al., 2022](https://www.alphaxiv.org/abs/2203.02155)) and ChatGPT:
 
 1. **SFT** on human demonstrations;
 2. train a **reward model** on human comparisons;
@@ -1004,7 +1004,7 @@ The idea of learning a reward from human comparisons predates language models: [
 ## Why not just more SFT?
 <!-- type: content -->
 
-Human preferences are hard to express as single demonstrations:
+Human preferences are hard to express:
 
 - *"Explain quantum mechanics to a 5-year-old"*: is a short or a long answer better?
 - *"Write a poem about sadness"*: there is no unique right answer.
@@ -1124,7 +1124,7 @@ The policy maximises the **score of the reward model**, not the actual quality. 
 This is an instance of Goodhart's law: when a measure becomes a target, it ceases to be a good measure. [Gao et al. (2023)](https://www.alphaxiv.org/abs/2210.10760) measured it with a large "gold" reward model playing the role of the humans: as the policy optimises a smaller proxy reward model, the gold reward first increases, then decreases, while the proxy reward keeps increasing. Larger reward models and more preference data push the turning point further.
 :::
 
-## Interview: the reward goes up, the users are unhappy {.interview}
+## Interview: the reward goes up, but the model is worse for users {.interview}
 <!-- type: interview -->
 
 During RLHF with PPO, the score of the reward model keeps increasing. Human raters, however, say that the model stopped improving after a few hundred steps and has been getting worse since. Its answers are now twice as long as at the start.
@@ -1321,7 +1321,16 @@ A linear head on frozen features, trained on 19 pairs, ranks 65% of the held-out
 ## Direct preference optimization (DPO)
 <!-- type: content -->
 
-The optimal policy of the RL objective has a closed form. With it, we can train on the preference pairs **without a reward model and without sampling**.
+RLHF fits a reward model $r$ on the preference pairs, then uses RL to maximise the **KL-penalised objective** of Section 3:
+$$\max_\pi\ \mathbb{E}_{y \sim \pi(\cdot \mid x)}\big[r(x, y)\big] - \beta\, \mathrm{KL}\big[\pi(\cdot \mid x) \,\|\, \pi_\text{ref}(\cdot \mid x)\big]$$
+
+. . .
+
+DPO replaces these two steps by one:
+
+- The optimal policy of this objective has a **closed form**: each reward defines a policy, and each policy defines a reward (next slide).
+- We can therefore fit the **policy directly** on the preference pairs, with the Bradley-Terry loss of the reward model.
+- Training needs **no reward model and no sampling**: it is a classification loss on a fixed dataset.
 
 ::: lecture
 DPO was introduced by [Rafailov et al. (2023)](https://www.alphaxiv.org/abs/2305.18290), under the title *Your Language Model is Secretly a Reward Model*. It optimises the same objective as RLHF, the reward minus a KL penalty to the reference, but on a fixed dataset of preferences and with a simple classification loss: no sampling during training, no reward model, no value model. In the terms of Section 3, it is an offline method: it belongs to the family of Section 2, with a loss derived from the RL objective.
@@ -1330,20 +1339,24 @@ DPO was introduced by [Rafailov et al. (2023)](https://www.alphaxiv.org/abs/2305
 ## The DPO insight
 <!-- type: content -->
 
-The KL-penalised objective has a closed-form optimal policy:
-$$\pi^*(y \mid x) = \frac{\pi_\text{ref}(y \mid x)\, e^{r(x,y)/\beta}}{Z(x)}, \qquad Z(x) = \sum_y \pi_\text{ref}(y \mid x)\, e^{r(x,y)/\beta}$$
+**1. Closed form.** Let $\pi^*(y \mid x) = \pi_\text{ref}(y \mid x)\, e^{r(x,y)/\beta} / Z(x)$, where the **partition function** $Z(x)$ normalises. For a fixed prompt $x$,
+$$\mathbb{E}_{y \sim \pi}[r(x, y)] - \beta\, \mathrm{KL}(\pi \,\|\, \pi_\text{ref}) = -\beta\, \mathrm{KL}(\pi \,\|\, \pi^*) + \beta \log Z(x),$$
+which is maximal at $\pi = \pi^*$.
 
-$Z(x)$ is the **partition function**: the normalisation constant (summing over all completions $y$) that makes $\pi^*$ a valid probability distribution. It depends only on the prompt $x$, not on any specific completion.
+. . .
 
-Inverting this gives the reward in terms of the policy:
-$$r^*(x, y) = \beta \log \frac{\pi^*(y|x)}{\pi_\text{ref}(y|x)} + \beta \log Z(x)$$
+**2. Inversion.** Taking logarithms, the reward is a function of its optimal policy:
+$$r(x, y) = \beta \log \frac{\pi^*(y \mid x)}{\pi_\text{ref}(y \mid x)} + \beta \log Z(x)$$
 
-Plugging this into the Bradley-Terry loss, $Z(x)$ **cancels** (same prompt for $y_w$ and $y_l$), eliminating the reward model entirely.
+. . .
+
+**3. Bradley-Terry.** $P(y_w \succ y_l \mid x) = \sigma\big(r(x, y_w) - r(x, y_l)\big)$, so $Z(x)$ **cancels**:
+$$P(y_w \succ y_l \mid x) = \sigma\Big(\beta \log \frac{\pi^*(y_w \mid x)}{\pi_\text{ref}(y_w \mid x)} - \beta \log \frac{\pi^*(y_l \mid x)}{\pi_\text{ref}(y_l \mid x)}\Big)$$
 
 ::: lecture
-The closed form comes from rewriting the objective. For a fixed prompt,
-$$\mathbb{E}_{y \sim \pi}[r(x, y)] - \beta\, \mathrm{KL}(\pi \,\|\, \pi_\text{ref}) = -\beta\, \mathrm{KL}(\pi \,\|\, \pi^*) + \beta \log Z(x),$$
-and the right-hand side is maximal when the KL vanishes, that is when $\pi = \pi^*$. The partition function $Z(x)$ sums over all possible responses and cannot be computed, which is why the cancellation matters: the Bradley-Terry model only uses differences of rewards for the same prompt. DPO then reads the formula backwards: any policy $\pi_\theta$ defines an implicit reward $\beta \log \frac{\pi_\theta(y \mid x)}{\pi_\text{ref}(y \mid x)}$, and we fit the policy so that this implicit reward explains the preferences.
+The identity of step 1 comes from writing the reward as a log: $r(x, y)/\beta = \log \frac{\pi^*(y \mid x)}{\pi_\text{ref}(y \mid x)} + \log Z(x)$. Then
+$$\mathbb{E}_{y \sim \pi}\Big[r(x, y) - \beta \log \frac{\pi(y \mid x)}{\pi_\text{ref}(y \mid x)}\Big] = -\beta\, \mathbb{E}_{y \sim \pi}\Big[\log \frac{\pi(y \mid x)}{\pi^*(y \mid x)}\Big] + \beta \log Z(x) = -\beta\, \mathrm{KL}(\pi \,\|\, \pi^*) + \beta \log Z(x).$$
+The last term does not depend on $\pi$, and the KL is non-negative and vanishes only at $\pi = \pi^*$: no calculus is needed. The partition function $Z(x) = \sum_y \pi_\text{ref}(y \mid x)\, e^{r(x,y)/\beta}$ sums over all possible responses and cannot be computed, which is why the cancellation of step 3 matters: the Bradley-Terry model only uses differences of rewards for the same prompt. DPO then reads the formula backwards: any policy $\pi_\theta$ defines an implicit reward $\beta \log \frac{\pi_\theta(y \mid x)}{\pi_\text{ref}(y \mid x)}$. Replacing $\pi^*$ by $\pi_\theta$ in step 3 and maximising the likelihood of the preference pairs gives the DPO loss of the next slide.
 :::
 
 ## The DPO loss
@@ -1633,7 +1646,7 @@ RLVR ([Lambert et al., 2024](https://www.alphaxiv.org/abs/2411.15124)) combines 
 
 . . .
 
-> Only the final answer is checked, **never the reasoning**. The model may reason in any way that leads to correct answers, readable or not.
+> Only the final answer is checked, **not the reasoning**. The model may reason in any way that leads to correct answers, readable or not.
 
 ::: lecture
 The name RLVR, reinforcement learning with verifiable rewards, comes from the Tülu 3 report. The format reward makes the final answer easy to extract, for instance between given tags or in a box, so that the correctness check is reliable. The lab trains a small model with such a pair of rewards on two-digit additions.
@@ -1754,7 +1767,7 @@ It measures **coverage**, and needs an oracle that recognises a correct answer, 
 Variants:
 
 - **avg@k**: each correct answer counts for $1/k$; it estimates pass@1 with less noise.
-- **maj@k**, or cons@k: the most frequent answer is correct; no oracle needed.
+- **maj@k**, or cons@k: the most frequent answer is correct; choosing it needs no oracle.
 - **best-of-k**: the answer chosen by a verifier is correct.
 - **pass^k**: **all** $k$ answers are correct; it measures reliability.
 
@@ -2649,7 +2662,7 @@ An RL answer carries a few bits (one reward), an SFT answer a few bits per token
 
 . . .
 
-The variant matters. On R1-Distill-Qwen-1.5B, at 40.5 before RL: DoRA 46.6, full 44.9, LoRA 42.5, rank-1 LoRA 40.5, PiSSA 0.2 ([Yin et al., 2025](https://www.alphaxiv.org/abs/2512.23165)).
+[Yin et al. (2025)](https://www.alphaxiv.org/abs/2512.23165) compare the variants of LoRA in RL. On R1-Distill-Qwen-1.5B, at 40.5 before RL: DoRA 46.6, full 44.9, LoRA 42.5, rank-1 LoRA 40.5, PiSSA 0.2.
 
 ::: lecture
 The argument of [Schulman et al.](https://thinkingmachines.ai/blog/lora/) (2025, *LoRA Without Regret*, Thinking Machines) is information-theoretic. Policy-gradient learning is driven by the advantage, about one number per answer, so training on 10,000 MATH problems with 32 answers each gives at most about 320,000 bits, while a rank-1 adapter of Llama-3.1-8B already has 3 million parameters. The same study gives practical rules that hold for SFT and RL: apply LoRA to all the layers, the MLP included, since attention-only LoRA underperforms; use a learning rate about 10 times larger than for full fine-tuning; and avoid very large batches, which hurt LoRA more than full fine-tuning. In SFT, LoRA matches full fine-tuning as long as the dataset fits in the capacity of the adapter, which is the regime of the previous slide.

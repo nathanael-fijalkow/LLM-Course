@@ -2326,7 +2326,7 @@ margin-bottom: 0.8rem;
   <li><a href="#the-alignment-problem" id="toc-the-alignment-problem" class="nav-link" data-scroll-target="#the-alignment-problem">The alignment problem</a></li>
   <li><a href="#chat-templates" id="toc-chat-templates" class="nav-link" data-scroll-target="#chat-templates">Chat templates</a></li>
   <li><a href="#applying-a-chat-template-in-code" id="toc-applying-a-chat-template-in-code" class="nav-link" data-scroll-target="#applying-a-chat-template-in-code">Applying a chat template in code</a></li>
-  <li><a href="#interview-the-assistant-that-never-stops" id="toc-interview-the-assistant-that-never-stops" class="nav-link" data-scroll-target="#interview-the-assistant-that-never-stops">Interview: the assistant that never stops</a></li>
+  <li><a href="#interview-the-assistant-never-stops" id="toc-interview-the-assistant-never-stops" class="nav-link" data-scroll-target="#interview-the-assistant-never-stops">Interview: the assistant never stops</a></li>
   <li><a href="#lab-chat" id="toc-lab-chat" class="nav-link" data-scroll-target="#lab-chat">Lab: chat templates and the instruct model</a></li>
   </ul></li>
   <li><a href="#learning-from-labels" id="toc-learning-from-labels" class="nav-link" data-scroll-target="#learning-from-labels">2. Learning from Labels</a>
@@ -2364,7 +2364,7 @@ margin-bottom: 0.8rem;
   <li><a href="#reward-model-code" id="toc-reward-model-code" class="nav-link" data-scroll-target="#reward-model-code">Reward model code</a></li>
   <li><a href="#rlhf-with-ppo-four-models" id="toc-rlhf-with-ppo-four-models" class="nav-link" data-scroll-target="#rlhf-with-ppo-four-models">RLHF with PPO: four models</a></li>
   <li><a href="#reward-hacking" id="toc-reward-hacking" class="nav-link" data-scroll-target="#reward-hacking">Reward hacking</a></li>
-  <li><a href="#interview-the-reward-goes-up-the-users-are-unhappy" id="toc-interview-the-reward-goes-up-the-users-are-unhappy" class="nav-link" data-scroll-target="#interview-the-reward-goes-up-the-users-are-unhappy">Interview: the reward goes up, the users are unhappy</a></li>
+  <li><a href="#interview-the-reward-goes-up-but-the-model-is-worse-for-users" id="toc-interview-the-reward-goes-up-but-the-model-is-worse-for-users" class="nav-link" data-scroll-target="#interview-the-reward-goes-up-but-the-model-is-worse-for-users">Interview: the reward goes up, but the model is worse for users</a></li>
   <li><a href="#rlaif-ai-feedback-instead-of-human-feedback" id="toc-rlaif-ai-feedback-instead-of-human-feedback" class="nav-link" data-scroll-target="#rlaif-ai-feedback-instead-of-human-feedback">RLAIF: AI feedback instead of human feedback</a></li>
   <li><a href="#lab-reward-model" id="toc-lab-reward-model" class="nav-link" data-scroll-target="#lab-reward-model">Lab: preference pairs and a reward model</a></li>
   <li><a href="#direct-preference-optimization-dpo" id="toc-direct-preference-optimization-dpo" class="nav-link" data-scroll-target="#direct-preference-optimization-dpo">Direct preference optimization (DPO)</a></li>
@@ -2470,7 +2470,7 @@ margin-bottom: 0.8rem;
 <p><strong>Also available as:</strong> <a href="../slides/05_post_training.html">slides</a> · <a href="https://colab.research.google.com/github/nathanael-fijalkow/LLM-Course/blob/main/notebooks/05_post_training.ipynb">notebook (Colab)</a> · <a href="https://github.com/nathanael-fijalkow/LLM-Course/blob/main/notebooks/05_post_training.ipynb">notebook (GitHub)</a></p>
 <p>These notes follow the slides of the fifth lecture and add the explanations given in class. The lecture is organised by the kind of data available: first the methods that learn from labels (Section 2), then reinforcement learning, sorted by the kind of reward (Sections 3 to 7). Each part of the lab comes after the part of the lecture it illustrates: we fine-tune a model of 135M parameters with supervised fine-tuning, DPO, GRPO, on-policy self-distillation and LoRA, train a reward model on its hidden states, and fit an arena leaderboard. The code and its results are shown in full; the notebook contains the same code, ready to run.</p>
 <p>Eleven interview questions, of the kind asked for machine learning engineer and research positions, are spread over the lecture. They are framed in orange, and each is followed by a detailed answer and discussion, folded so that you can think about the question first.</p>
-<div id="fb3adb22" class="cell" data-execution_count="1">
+<div id="fb3adb22" class="cell" data-execution_count="2">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
@@ -2634,7 +2634,7 @@ The capital of France is Paris.
 </section>
 <section id="applying-a-chat-template-in-code" class="level2">
 <h2 class="anchored" data-anchor-id="applying-a-chat-template-in-code">Applying a chat template in code</h2>
-<div id="b29ece3a" class="cell" data-execution_count="2">
+<div id="b29ece3a" class="cell" data-execution_count="3">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>tokenizer <span class="op">=</span> AutoTokenizer.from_pretrained(<span class="st">&quot;HuggingFaceTB/SmolLM2-135M-Instruct&quot;</span>)</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>messages <span class="op">=</span> [</span>
@@ -2662,8 +2662,8 @@ What is the capital of France?&lt;|im_end|&gt;
 </div>
 <p>The model then <strong>continues</strong> from the assistant marker.</p>
 </section>
-<section id="interview-the-assistant-that-never-stops" class="level2 interview">
-<h2 class="interview anchored" data-anchor-id="interview-the-assistant-that-never-stops">Interview: the assistant that never stops</h2>
+<section id="interview-the-assistant-never-stops" class="level2 interview">
+<h2 class="interview anchored" data-anchor-id="interview-the-assistant-never-stops">Interview: the assistant never stops</h2>
 <p>You fine-tune a base model on conversations formatted with the ChatML template. At inference, the model answers correctly, but then goes on: it writes a new user turn, answers it, and only stops at <code>max_new_tokens</code>.</p>
 <p>What are the likely causes? How do you fix this?</p>
 <details class="interview-answer"><summary>Answer and discussion</summary>
@@ -2746,7 +2746,7 @@ What is the capital of France?&lt;|im_end|&gt;
 </table>
 <section id="setup" class="level3">
 <h3 class="anchored" data-anchor-id="setup">Setup</h3>
-<div id="2909c9e6" class="cell" data-execution_count="3">
+<div id="2909c9e6" class="cell" data-execution_count="4">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> copy</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> gc</span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> random</span>
@@ -2796,7 +2796,7 @@ What is the capital of France?&lt;|im_end|&gt;
 <section id="the-instruct-model" class="level3">
 <h3 class="anchored" data-anchor-id="the-instruct-model">The instruct model</h3>
 <p>We load <code>SmolLM2-135M-Instruct</code>, a tiny model that has already been aligned. Understanding how it was produced is the goal of this lab.</p>
-<div id="99b047ad" class="cell" data-execution_count="4">
+<div id="99b047ad" class="cell" data-execution_count="5">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>MODEL <span class="op">=</span> <span class="st">&quot;HuggingFaceTB/SmolLM2-135M-Instruct&quot;</span></span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>instruct_tokenizer <span class="op">=</span> AutoTokenizer.from_pretrained(MODEL)</span>
@@ -2811,7 +2811,7 @@ What is the capital of France?&lt;|im_end|&gt;
 <section id="chat-templates-1" class="level3">
 <h3 class="anchored" data-anchor-id="chat-templates-1">Chat templates</h3>
 <p>Instruct models expect conversations in a specific format. SmolLM2 uses <strong>ChatML</strong>: <code>&lt;|im_start|&gt;role\ncontent&lt;|im_end|&gt;</code>. <code>apply_chat_template</code> handles all the formatting automatically.</p>
-<div id="ecba3709" class="cell" data-execution_count="5">
+<div id="ecba3709" class="cell" data-execution_count="6">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> make_prompt(user_message, system<span class="op">=</span><span class="st">&quot;You are a helpful assistant.&quot;</span>):</span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>    messages <span class="op">=</span> [</span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>        {<span class="st">&quot;role&quot;</span>: <span class="st">&quot;system&quot;</span>, <span class="st">&quot;content&quot;</span>: system},</span>
@@ -2838,7 +2838,7 @@ What is the capital of France?&lt;|im_end|&gt;
 </code></pre>
 </div>
 </div>
-<div id="072662b7" class="cell" data-execution_count="6">
+<div id="072662b7" class="cell" data-execution_count="7">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> generate(prompt_text, mdl<span class="op">=</span><span class="va">None</span>, tok<span class="op">=</span><span class="va">None</span>, max_new_tokens<span class="op">=</span><span class="dv">80</span>):</span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> mdl <span class="kw">is</span> <span class="va">None</span>: mdl <span class="op">=</span> instruct_model</span>
 <span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> tok <span class="kw">is</span> <span class="va">None</span>: tok <span class="op">=</span> instruct_tokenizer</span>
@@ -2965,7 +2965,7 @@ A: Gradient descent is a method for updating the parameters of a neural network 
 </section>
 <section id="loss-masking" class="level2">
 <h2 class="anchored" data-anchor-id="loss-masking">Loss masking</h2>
-<div id="9ea4be2f" class="cell" data-execution_count="7">
+<div id="9ea4be2f" class="cell" data-execution_count="8">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>tokenizer <span class="op">=</span> AutoTokenizer.from_pretrained(<span class="st">&quot;gpt2&quot;</span>)</span>
 <span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>tokenizer.pad_token <span class="op">=</span> tokenizer.eos_token</span>
 <span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -3075,7 +3075,7 @@ TRAIN:  [&#39; The&#39;, &#39; capital&#39;, &#39; of&#39;, &#39; France&#39;, &
 <section id="loss-masking-why-it-matters" class="level3">
 <h3 class="anchored" data-anchor-id="loss-masking-why-it-matters">Loss masking: why it matters</h3>
 <p>Without masking, the model would be penalized for not predicting the prompt itself, wasting gradient signal on text we already know.</p>
-<div id="412d1b22" class="cell" data-execution_count="8">
+<div id="412d1b22" class="cell" data-execution_count="9">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> show_loss_masking(prompt_text, response_text):</span>
 <span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">&quot;&quot;&quot;Print which tokens are masked (prompt) vs. trained on (response).&quot;&quot;&quot;</span></span>
 <span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>    prompt_ids   <span class="op">=</span> instruct_tokenizer.encode(prompt_text,   add_special_tokens<span class="op">=</span><span class="va">False</span>)</span>
@@ -3115,7 +3115,7 @@ TRAIN:  [&#39; The&#39;, &#39; capital&#39;, &#39; of&#39;, &#39; France&#39;, &
 <section id="sft-dataset" class="level3">
 <h3 class="anchored" data-anchor-id="sft-dataset">SFT dataset</h3>
 <p>We create 44 simple Q&amp;A pairs and fine-tune using <code>trl.SFTTrainer</code>.</p>
-<div id="aab35eea" class="cell" data-execution_count="9">
+<div id="aab35eea" class="cell" data-execution_count="10">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> datasets <span class="im">import</span> Dataset</span>
 <span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>BASE_MODEL    <span class="op">=</span> <span class="st">&quot;HuggingFaceTB/SmolLM2-135M&quot;</span>   <span class="co"># base, not instruct</span></span>
@@ -3216,7 +3216,7 @@ The capital of France is Paris.&lt;|im_end|&gt;
 <section id="fine-tuning-with-sfttrainer" class="level3">
 <h3 class="anchored" data-anchor-id="fine-tuning-with-sfttrainer">Fine-tuning with SFTTrainer</h3>
 <p>We load the <strong>base</strong> (unaligned) SmolLM2-135M and fine-tune it on our dataset. The dataset is given as plain text, so the trainer computes the loss on every token, prompt included: with such short prompts this makes little difference. To mask the prompt, give the dataset as prompt-completion pairs, or as conversations with <code>assistant_only_loss=True</code> as on the slide.</p>
-<div id="3388ea7b" class="cell" data-execution_count="10">
+<div id="3388ea7b" class="cell" data-execution_count="11">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> trl <span class="im">import</span> SFTTrainer, SFTConfig</span>
 <span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>sft_model <span class="op">=</span> AutoModelForCausalLM.from_pretrained(BASE_MODEL, dtype<span class="op">=</span>torch.bfloat16).to(device)</span>
@@ -3258,7 +3258,7 @@ The capital of France is Paris.&lt;|im_end|&gt;
 Done. Final loss: 1.3016</code></pre>
 </div>
 </div>
-<div id="e7c746a3" class="cell" data-execution_count="11">
+<div id="e7c746a3" class="cell" data-execution_count="12">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot training loss</span></span>
 <span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>log <span class="op">=</span> trainer.state.log_history</span>
 <span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>steps  <span class="op">=</span> [x[<span class="st">&quot;step&quot;</span>] <span class="cf">for</span> x <span class="kw">in</span> log <span class="cf">if</span> <span class="st">&quot;loss&quot;</span> <span class="kw">in</span> x]</span>
@@ -3276,7 +3276,7 @@ Done. Final loss: 1.3016</code></pre>
 </div>
 </div>
 </div>
-<div id="88817c43" class="cell" data-execution_count="12">
+<div id="88817c43" class="cell" data-execution_count="13">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Test the SFT model</span></span>
 <span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> q <span class="kw">in</span> [<span class="st">&quot;What is the capital of France?&quot;</span>, <span class="st">&quot;What is 7 × 8?&quot;</span>, <span class="st">&quot;What is a neural network?&quot;</span>]:</span>
 <span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>    ans <span class="op">=</span> generate(make_prompt(q), mdl<span class="op">=</span>sft_model, tok<span class="op">=</span>sft_tokenizer)</span>
@@ -3500,7 +3500,7 @@ A: A neural network is a machine learning model made of layers of connected neur
 </section>
 <section id="reusing-samples-importance-sampling" class="level2">
 <h2 class="anchored" data-anchor-id="reusing-samples-importance-sampling">Reusing samples: importance sampling</h2>
-<p>Generation is the expensive part: PPO reuses each batch, sampled by <span class="math inline">\pi_{\text{old}}</span>, for several gradient steps. After the first step, the samples no longer come from <span class="math inline">\pi_\theta</span>.</p>
+<p>Generation is the expensive part: PPO reuses each batch for several gradient steps. After the first step, the samples no longer come from <span class="math inline">\pi_\theta</span> but from <span class="math inline">\pi_{\text{old}}</span>, the policy that <strong>sampled the batch</strong> (not the frozen reference <span class="math inline">\pi_\text{ref}</span>).</p>
 <p><strong>Importance sampling</strong> reweights samples of one distribution to estimate an expectation under another: <span class="math display">\mathbb{E}_{y \sim \pi_\theta}[f(y)] = \mathbb{E}_{y \sim \pi_{\text{old}}}\Big[\frac{\pi_\theta(y)}{\pi_{\text{old}}(y)}\, f(y)\Big]</span></p>
 <p>Per token, with the state <span class="math inline">s_t = (x, y_{&lt;t})</span> and the ratio <span class="math inline">\rho_t = \pi_\theta(y_t \mid s_t) / \pi_{\text{old}}(y_t \mid s_t)</span>: <span class="math display">\mathcal{L}(\theta) = \mathbb{E}_t\big[\rho_t A_t\big]</span></p>
 <ul>
@@ -3610,7 +3610,7 @@ A: A neural network is a machine learning model made of layers of connected neur
 </section>
 <section id="rewards-learned-from-preferences" class="level1">
 <h1>4. Rewards Learned from Preferences</h1>
-<p>RLHF, the recipe of InstructGPT (<a href="https://www.alphaxiv.org/abs/2203.02155">Ouyang et al., 2022</a>) and ChatGPT, in three steps:</p>
+<p>RLHF, the recipe of InstructGPT (<a href="https://www.alphaxiv.org/abs/2203.02155">Ouyang et al., 2022</a>) and ChatGPT:</p>
 <ol type="1">
 <li><strong>SFT</strong> on human demonstrations;</li>
 <li>train a <strong>reward model</strong> on human comparisons;</li>
@@ -3620,7 +3620,7 @@ A: A neural network is a machine learning model made of layers of connected neur
 <p>The idea of learning a reward from human comparisons predates language models: <a href="https://www.alphaxiv.org/abs/1706.03741">Christiano et al. (2017)</a> used it to train agents on Atari games and simulated robotics, and <a href="https://www.alphaxiv.org/abs/2009.01325">Stiennon et al. (2020)</a> applied it to summarization. InstructGPT made it the standard recipe for assistants. Its result on model size was a surprise at the time: in the eyes of the labelers, alignment made a model a hundred times smaller more useful than the original GPT-3.</p>
 <section id="why-not-just-more-sft" class="level2">
 <h2 class="anchored" data-anchor-id="why-not-just-more-sft">Why not just more SFT?</h2>
-<p>Human preferences are hard to express as single demonstrations:</p>
+<p>Human preferences are hard to express:</p>
 <ul>
 <li><em>“Explain quantum mechanics to a 5-year-old”</em>: is a short or a long answer better?</li>
 <li><em>“Write a poem about sadness”</em>: there is no unique right answer.</li>
@@ -3648,7 +3648,7 @@ A: A neural network is a machine learning model made of layers of connected neur
 </section>
 <section id="reward-model-code" class="level2">
 <h2 class="anchored" data-anchor-id="reward-model-code">Reward model code</h2>
-<div id="dddd53c4" class="cell" data-execution_count="13">
+<div id="dddd53c4" class="cell" data-execution_count="14">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> SimpleRewardModel(nn.Module):</span>
 <span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, input_dim):</span>
 <span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>()</span>
@@ -3733,8 +3733,8 @@ A: A neural network is a machine learning model made of layers of connected neur
 </blockquote>
 <p>This is an instance of Goodhart’s law: when a measure becomes a target, it ceases to be a good measure. <a href="https://www.alphaxiv.org/abs/2210.10760">Gao et al. (2023)</a> measured it with a large “gold” reward model playing the role of the humans: as the policy optimises a smaller proxy reward model, the gold reward first increases, then decreases, while the proxy reward keeps increasing. Larger reward models and more preference data push the turning point further.</p>
 </section>
-<section id="interview-the-reward-goes-up-the-users-are-unhappy" class="level2 interview">
-<h2 class="interview anchored" data-anchor-id="interview-the-reward-goes-up-the-users-are-unhappy">Interview: the reward goes up, the users are unhappy</h2>
+<section id="interview-the-reward-goes-up-but-the-model-is-worse-for-users" class="level2 interview">
+<h2 class="interview anchored" data-anchor-id="interview-the-reward-goes-up-but-the-model-is-worse-for-users">Interview: the reward goes up, but the model is worse for users</h2>
 <p>During RLHF with PPO, the score of the reward model keeps increasing. Human raters, however, say that the model stopped improving after a few hundred steps and has been getting worse since. Its answers are now twice as long as at the start.</p>
 <p>What is happening, and what would you do?</p>
 <details class="interview-answer"><summary>Answer and discussion</summary>
@@ -3774,7 +3774,7 @@ A: A neural network is a machine learning model made of layers of connected neur
 <section id="a-preference-dataset" class="level3">
 <h3 class="anchored" data-anchor-id="a-preference-dataset">A preference dataset</h3>
 <p>We write 20 preference pairs: for each prompt, a chosen and a rejected response. They are used twice: to train a reward model here, and to train with DPO in the next part of the lab.</p>
-<div id="330db859" class="cell" data-execution_count="14">
+<div id="330db859" class="cell" data-execution_count="15">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>preference_data <span class="op">=</span> [</span>
 <span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Factual accuracy</span></span>
 <span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>    (<span class="st">&quot;What is the capital of France?&quot;</span>,</span>
@@ -3881,7 +3881,7 @@ rejected: &#39;The capital of France is Lyon.&lt;|im_end|&gt;&#39;</code></pre>
 <section id="a-reward-model-on-the-models-own-hidden-states" class="level3">
 <h3 class="anchored" data-anchor-id="a-reward-model-on-the-models-own-hidden-states">A reward model on the model’s own hidden states</h3>
 <p>The reward model of RLHF scores a (prompt, response) pair. A standard architecture: the language model itself, with its output layer replaced by a linear head on the last hidden state. We freeze the SFT model of the previous part and train only the linear head, with the Bradley-Terry loss <span class="math inline">-\log \sigma(r(x, y_w) - r(x, y_l))</span>, on the preference pairs above. With 20 pairs, we evaluate by leave-one-out: train on 19 pairs, test on the remaining one, 20 times.</p>
-<div id="5ab57dde" class="cell" data-execution_count="15">
+<div id="5ab57dde" class="cell" data-execution_count="16">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="at">@torch.no_grad</span>()</span>
 <span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> last_hidden(text):</span>
 <span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>    ids <span class="op">=</span> sft_tokenizer(text, return_tensors<span class="op">=</span><span class="st">&quot;pt&quot;</span>).to(device)</span>
@@ -3929,16 +3929,21 @@ leave-one-out ranking accuracy: 65% (chance: 50%)
 </section>
 <section id="direct-preference-optimization-dpo" class="level2">
 <h2 class="anchored" data-anchor-id="direct-preference-optimization-dpo">Direct preference optimization (DPO)</h2>
-<p>The optimal policy of the RL objective has a closed form. With it, we can train on the preference pairs <strong>without a reward model and without sampling</strong>.</p>
+<p>RLHF fits a reward model <span class="math inline">r</span> on the preference pairs, then uses RL to maximise the <strong>KL-penalised objective</strong> of Section 3: <span class="math display">\max_\pi\ \mathbb{E}_{y \sim \pi(\cdot \mid x)}\big[r(x, y)\big] - \beta\, \mathrm{KL}\big[\pi(\cdot \mid x) \,\|\, \pi_\text{ref}(\cdot \mid x)\big]</span></p>
+<p>DPO replaces these two steps by one:</p>
+<ul>
+<li>The optimal policy of this objective has a <strong>closed form</strong>: each reward defines a policy, and each policy defines a reward (next slide).</li>
+<li>We can therefore fit the <strong>policy directly</strong> on the preference pairs, with the Bradley-Terry loss of the reward model.</li>
+<li>Training needs <strong>no reward model and no sampling</strong>: it is a classification loss on a fixed dataset.</li>
+</ul>
 <p>DPO was introduced by <a href="https://www.alphaxiv.org/abs/2305.18290">Rafailov et al. (2023)</a>, under the title <em>Your Language Model is Secretly a Reward Model</em>. It optimises the same objective as RLHF, the reward minus a KL penalty to the reference, but on a fixed dataset of preferences and with a simple classification loss: no sampling during training, no reward model, no value model. In the terms of Section 3, it is an offline method: it belongs to the family of Section 2, with a loss derived from the RL objective.</p>
 </section>
 <section id="the-dpo-insight" class="level2">
 <h2 class="anchored" data-anchor-id="the-dpo-insight">The DPO insight</h2>
-<p>The KL-penalised objective has a closed-form optimal policy: <span class="math display">\pi^*(y \mid x) = \frac{\pi_\text{ref}(y \mid x)\, e^{r(x,y)/\beta}}{Z(x)}, \qquad Z(x) = \sum_y \pi_\text{ref}(y \mid x)\, e^{r(x,y)/\beta}</span></p>
-<p><span class="math inline">Z(x)</span> is the <strong>partition function</strong>: the normalisation constant (summing over all completions <span class="math inline">y</span>) that makes <span class="math inline">\pi^*</span> a valid probability distribution. It depends only on the prompt <span class="math inline">x</span>, not on any specific completion.</p>
-<p>Inverting this gives the reward in terms of the policy: <span class="math display">r^*(x, y) = \beta \log \frac{\pi^*(y|x)}{\pi_\text{ref}(y|x)} + \beta \log Z(x)</span></p>
-<p>Plugging this into the Bradley-Terry loss, <span class="math inline">Z(x)</span> <strong>cancels</strong> (same prompt for <span class="math inline">y_w</span> and <span class="math inline">y_l</span>), eliminating the reward model entirely.</p>
-<p>The closed form comes from rewriting the objective. For a fixed prompt, <span class="math display">\mathbb{E}_{y \sim \pi}[r(x, y)] - \beta\, \mathrm{KL}(\pi \,\|\, \pi_\text{ref}) = -\beta\, \mathrm{KL}(\pi \,\|\, \pi^*) + \beta \log Z(x),</span> and the right-hand side is maximal when the KL vanishes, that is when <span class="math inline">\pi = \pi^*</span>. The partition function <span class="math inline">Z(x)</span> sums over all possible responses and cannot be computed, which is why the cancellation matters: the Bradley-Terry model only uses differences of rewards for the same prompt. DPO then reads the formula backwards: any policy <span class="math inline">\pi_\theta</span> defines an implicit reward <span class="math inline">\beta \log \frac{\pi_\theta(y \mid x)}{\pi_\text{ref}(y \mid x)}</span>, and we fit the policy so that this implicit reward explains the preferences.</p>
+<p><strong>1. Closed form.</strong> Let <span class="math inline">\pi^*(y \mid x) = \pi_\text{ref}(y \mid x)\, e^{r(x,y)/\beta} / Z(x)</span>, where the <strong>partition function</strong> <span class="math inline">Z(x)</span> normalises. For a fixed prompt <span class="math inline">x</span>, <span class="math display">\mathbb{E}_{y \sim \pi}[r(x, y)] - \beta\, \mathrm{KL}(\pi \,\|\, \pi_\text{ref}) = -\beta\, \mathrm{KL}(\pi \,\|\, \pi^*) + \beta \log Z(x),</span> which is maximal at <span class="math inline">\pi = \pi^*</span>.</p>
+<p><strong>2. Inversion.</strong> Taking logarithms, the reward is a function of its optimal policy: <span class="math display">r(x, y) = \beta \log \frac{\pi^*(y \mid x)}{\pi_\text{ref}(y \mid x)} + \beta \log Z(x)</span></p>
+<p><strong>3. Bradley-Terry.</strong> <span class="math inline">P(y_w \succ y_l \mid x) = \sigma\big(r(x, y_w) - r(x, y_l)\big)</span>, so <span class="math inline">Z(x)</span> <strong>cancels</strong>: <span class="math display">P(y_w \succ y_l \mid x) = \sigma\Big(\beta \log \frac{\pi^*(y_w \mid x)}{\pi_\text{ref}(y_w \mid x)} - \beta \log \frac{\pi^*(y_l \mid x)}{\pi_\text{ref}(y_l \mid x)}\Big)</span></p>
+<p>The identity of step 1 comes from writing the reward as a log: <span class="math inline">r(x, y)/\beta = \log \frac{\pi^*(y \mid x)}{\pi_\text{ref}(y \mid x)} + \log Z(x)</span>. Then <span class="math display">\mathbb{E}_{y \sim \pi}\Big[r(x, y) - \beta \log \frac{\pi(y \mid x)}{\pi_\text{ref}(y \mid x)}\Big] = -\beta\, \mathbb{E}_{y \sim \pi}\Big[\log \frac{\pi(y \mid x)}{\pi^*(y \mid x)}\Big] + \beta \log Z(x) = -\beta\, \mathrm{KL}(\pi \,\|\, \pi^*) + \beta \log Z(x).</span> The last term does not depend on <span class="math inline">\pi</span>, and the KL is non-negative and vanishes only at <span class="math inline">\pi = \pi^*</span>: no calculus is needed. The partition function <span class="math inline">Z(x) = \sum_y \pi_\text{ref}(y \mid x)\, e^{r(x,y)/\beta}</span> sums over all possible responses and cannot be computed, which is why the cancellation of step 3 matters: the Bradley-Terry model only uses differences of rewards for the same prompt. DPO then reads the formula backwards: any policy <span class="math inline">\pi_\theta</span> defines an implicit reward <span class="math inline">\beta \log \frac{\pi_\theta(y \mid x)}{\pi_\text{ref}(y \mid x)}</span>. Replacing <span class="math inline">\pi^*</span> by <span class="math inline">\pi_\theta</span> in step 3 and maximising the likelihood of the preference pairs gives the DPO loss of the next slide.</p>
 </section>
 <section id="the-dpo-loss" class="level2">
 <h2 class="anchored" data-anchor-id="the-dpo-loss">The DPO loss</h2>
@@ -3952,7 +3957,7 @@ leave-one-out ranking accuracy: 65% (chance: 50%)
 </section>
 <section id="the-dpo-loss-in-code" class="level2">
 <h2 class="anchored" data-anchor-id="the-dpo-loss-in-code">The DPO loss in code</h2>
-<div id="a81b3908" class="cell" data-execution_count="16">
+<div id="a81b3908" class="cell" data-execution_count="17">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> dpo_loss(logp_w, logp_l, ref_logp_w, ref_logp_l, beta<span class="op">=</span><span class="fl">0.1</span>):</span>
 <span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>    <span class="co"># log-probabilities of the full chosen (w) and rejected (l) responses</span></span>
 <span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>    margin <span class="op">=</span> (logp_w <span class="op">-</span> ref_logp_w) <span class="op">-</span> (logp_l <span class="op">-</span> ref_logp_l)</span>
@@ -4052,7 +4057,7 @@ policy moved by   50 nats in favour of y_w: loss = 0.000</code></pre>
 <section id="the-dpo-loss-manual-computation" class="level3">
 <h3 class="anchored" data-anchor-id="the-dpo-loss-manual-computation">The DPO loss: manual computation</h3>
 <p>When the policy equals the reference, both log-ratios are zero and the DPO loss is <span class="math inline">\log 2 \approx 0.693</span> for every pair. The cell below computes instead the margin <span class="math inline">\beta(\log \pi(y_w \mid x) - \log \pi(y_l \mid x))</span> of the SFT model, that is the margin DPO would see against a reference that gives the same probability to both answers.</p>
-<div id="e755fda9" class="cell" data-execution_count="17">
+<div id="e755fda9" class="cell" data-execution_count="18">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb34"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> sequence_logprob(mdl, tok, text):</span>
 <span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">&quot;&quot;&quot;Total log-probability of text under model mdl.&quot;&quot;&quot;</span></span>
 <span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>    ids <span class="op">=</span> tok(text, return_tensors<span class="op">=</span><span class="st">&quot;pt&quot;</span>).input_ids.to(device)</span>
@@ -4094,7 +4099,7 @@ Initial DPO loss: 0.3285
 <section id="fine-tuning-with-dpotrainer" class="level3">
 <h3 class="anchored" data-anchor-id="fine-tuning-with-dpotrainer">Fine-tuning with DPOTrainer</h3>
 <p>The reference model is a frozen copy of the SFT model. We pass it explicitly: without <code>ref_model</code>, the trainer would reload the reference from the name of the model, that is the weights of the base model.</p>
-<div id="83b8d09f" class="cell" data-execution_count="18">
+<div id="83b8d09f" class="cell" data-execution_count="19">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb36"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> trl <span class="im">import</span> DPOTrainer, DPOConfig</span>
 <span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>dpo_model <span class="op">=</span> AutoModelForCausalLM.from_pretrained(BASE_MODEL, dtype<span class="op">=</span>torch.bfloat16).to(device)</span>
@@ -4142,7 +4147,7 @@ Initial DPO loss: 0.3285
 Done. Final loss: 0.4552</code></pre>
 </div>
 </div>
-<div id="dab852ed" class="cell" data-execution_count="19">
+<div id="dab852ed" class="cell" data-execution_count="20">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb38"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot chosen vs rejected rewards over training</span></span>
 <span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>log <span class="op">=</span> dpo_trainer.state.log_history</span>
 <span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a>steps    <span class="op">=</span> [x[<span class="st">&quot;step&quot;</span>]                    <span class="cf">for</span> x <span class="kw">in</span> log <span class="cf">if</span> <span class="st">&quot;rewards/chosen&quot;</span> <span class="kw">in</span> x]</span>
@@ -4251,7 +4256,7 @@ Done. Final loss: 0.4552</code></pre>
 </tbody>
 </table>
 <blockquote class="blockquote">
-<p>Only the final answer is checked, <strong>never the reasoning</strong>. The model may reason in any way that leads to correct answers, readable or not.</p>
+<p>Only the final answer is checked, <strong>not the reasoning</strong>. The model may reason in any way that leads to correct answers, readable or not.</p>
 </blockquote>
 <p>The name RLVR, reinforcement learning with verifiable rewards, comes from the Tülu 3 report. The format reward makes the final answer easy to extract, for instance between given tags or in a box, so that the correctness check is reliable. The lab trains a small model with such a pair of rewards on two-digit additions.</p>
 </section>
@@ -4332,7 +4337,7 @@ Done. Final loss: 0.4552</code></pre>
 <p>Variants:</p>
 <ul>
 <li><strong>avg@k</strong>: each correct answer counts for <span class="math inline">1/k</span>; it estimates pass@1 with less noise.</li>
-<li><strong>maj@k</strong>, or cons@k: the most frequent answer is correct; no oracle needed.</li>
+<li><strong>maj@k</strong>, or cons@k: the most frequent answer is correct; choosing it needs no oracle.</li>
 <li><strong>best-of-k</strong>: the answer chosen by a verifier is correct.</li>
 <li><strong>pass^k</strong>: <strong>all</strong> <span class="math inline">k</span> answers are correct; it measures reliability.</li>
 </ul>
@@ -4420,7 +4425,7 @@ Done. Final loss: 0.4552</code></pre>
 <p>GRPO is used for tasks with a <strong>verifiable reward</strong> (math, code, logic). Instead of a value model, it uses the <em>group average reward</em> as a baseline. This cuts memory from 4 models (PPO) to 2.</p>
 <section id="group-relative-advantages" class="level3">
 <h3 class="anchored" data-anchor-id="group-relative-advantages">Group-relative advantages</h3>
-<div id="11486f11" class="cell" data-execution_count="20">
+<div id="11486f11" class="cell" data-execution_count="21">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb41"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> grpo_advantages(rewards: torch.Tensor) <span class="op">-&gt;</span> torch.Tensor:</span>
 <span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">&quot;&quot;&quot;Normalize rewards within a group to zero mean, unit variance.&quot;&quot;&quot;</span></span>
 <span id="cb41-3"><a href="#cb41-3" aria-hidden="true" tabindex="-1"></a>    mean, std <span class="op">=</span> rewards.mean(), rewards.std()</span>
@@ -4457,7 +4462,7 @@ Mean=0.0000  Std=1.0000  (always ≈ 0 and 1 by construction)</code></pre>
 <section id="toy-grpo-training-loop" class="level3">
 <h3 class="anchored" data-anchor-id="toy-grpo-training-loop">Toy GRPO training loop</h3>
 <p>A single-parameter model learns to answer correctly more than 50% of the time.</p>
-<div id="e365068a" class="cell" data-execution_count="21">
+<div id="e365068a" class="cell" data-execution_count="22">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb43"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> simulate_grpo(num_prompts<span class="op">=</span><span class="dv">60</span>, group_size<span class="op">=</span><span class="dv">8</span>, num_epochs<span class="op">=</span><span class="dv">30</span>):</span>
 <span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a>    logit <span class="op">=</span> nn.Parameter(torch.tensor(<span class="fl">0.0</span>))   <span class="co"># P(correct) = sigmoid(logit) = 0.5 initially</span></span>
 <span id="cb43-3"><a href="#cb43-3" aria-hidden="true" tabindex="-1"></a>    opt   <span class="op">=</span> torch.optim.SGD([logit], lr<span class="op">=</span><span class="fl">0.3</span>)</span>
@@ -4506,13 +4511,13 @@ Mean=0.0000  Std=1.0000  (always ≈ 0 and 1 by construction)</code></pre>
 <li>maximize <span class="math inline">\sum_t A_i \log \pi_\theta(y_{i,t} \mid x, y_{i,&lt;t})</span>, averaged over the tokens of each answer, minus <span class="math inline">\beta</span> times a KL penalty to the initial model (the reference).</li>
 </ol>
 <p>With a single gradient step per batch of samples, the PPO ratio is 1 and clipping never acts: the objective reduces to this group-normalized policy gradient.</p>
-<div id="09d9e486" class="cell" data-execution_count="22">
+<div id="09d9e486" class="cell" data-execution_count="23">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb45"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Free memory: the trainers keep optimizer states and caches; we keep only the fine-tuned models.</span></span>
 <span id="cb45-2"><a href="#cb45-2" aria-hidden="true" tabindex="-1"></a>sft_history <span class="op">=</span> trainer.state.log_history     <span class="co"># the LoRA part compares its loss curve to this one</span></span>
 <span id="cb45-3"><a href="#cb45-3" aria-hidden="true" tabindex="-1"></a><span class="kw">del</span> trainer, dpo_trainer, dpo_reference</span>
 <span id="cb45-4"><a href="#cb45-4" aria-hidden="true" tabindex="-1"></a>free_memory()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<div id="a7fc3c34" class="cell" data-execution_count="23">
+<div id="a7fc3c34" class="cell" data-execution_count="24">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb46"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a>POLICY_NAME <span class="op">=</span> <span class="st">&quot;HuggingFaceTB/SmolLM2-135M-Instruct&quot;</span></span>
 <span id="cb46-2"><a href="#cb46-2" aria-hidden="true" tabindex="-1"></a>rl_tok <span class="op">=</span> AutoTokenizer.from_pretrained(POLICY_NAME)</span>
 <span id="cb46-3"><a href="#cb46-3" aria-hidden="true" tabindex="-1"></a>rl_tok.padding_side <span class="op">=</span> <span class="st">&quot;left&quot;</span>                                   <span class="co"># left padding for batched generation</span></span>
@@ -4561,7 +4566,7 @@ Mean=0.0000  Std=1.0000  (always ≈ 0 and 1 by construction)</code></pre>
    What is 44 + 23? Ans -&gt; &#39;44 + 23 = 77&#39;</code></pre>
 </div>
 </div>
-<div id="bd8c048a" class="cell" data-execution_count="24">
+<div id="bd8c048a" class="cell" data-execution_count="25">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb48"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> completion_logprobs(model, prompt_ids, prompt_mask, completion):</span>
 <span id="cb48-2"><a href="#cb48-2" aria-hidden="true" tabindex="-1"></a>    full <span class="op">=</span> torch.cat([prompt_ids, completion], <span class="dv">1</span>)</span>
 <span id="cb48-3"><a href="#cb48-3" aria-hidden="true" tabindex="-1"></a>    attention <span class="op">=</span> torch.cat([prompt_mask, torch.ones_like(completion)], <span class="dv">1</span>)</span>
@@ -4636,7 +4641,7 @@ Mean=0.0000  Std=1.0000  (always ≈ 0 and 1 by construction)</code></pre>
 </section>
 <section id="why-grpo-is-cheaper-than-ppo" class="level3">
 <h3 class="anchored" data-anchor-id="why-grpo-is-cheaper-than-ppo">Why GRPO is cheaper than PPO</h3>
-<div id="659e19ee" class="cell" data-execution_count="25">
+<div id="659e19ee" class="cell" data-execution_count="26">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb51"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a>methods <span class="op">=</span> {</span>
 <span id="cb51-2"><a href="#cb51-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;SFT&quot;</span>:         {<span class="st">&quot;models&quot;</span>: [<span class="st">&quot;policy&quot;</span>],                                     <span class="st">&quot;n&quot;</span>: <span class="dv">1</span>},</span>
 <span id="cb51-3"><a href="#cb51-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;DPO&quot;</span>:         {<span class="st">&quot;models&quot;</span>: [<span class="st">&quot;policy&quot;</span>, <span class="st">&quot;reference&quot;</span>],                        <span class="st">&quot;n&quot;</span>: <span class="dv">2</span>},</span>
@@ -4658,7 +4663,7 @@ GRPO            policy, reference                                           280 
 RLHF (PPO)      policy, value, reference, reward                            560 GB</code></pre>
 </div>
 </div>
-<div id="f824e810" class="cell" data-execution_count="26">
+<div id="f824e810" class="cell" data-execution_count="27">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb53"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a><span class="co"># The GRPO policy is not used again: free its memory before the next part</span></span>
 <span id="cb53-2"><a href="#cb53-2" aria-hidden="true" tabindex="-1"></a><span class="kw">del</span> policy, reference, optimizer</span>
 <span id="cb53-3"><a href="#cb53-3" aria-hidden="true" tabindex="-1"></a>free_memory()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -4904,7 +4909,7 @@ RLHF (PPO)      policy, value, reference, reward                            560 
 <section id="writing-the-teachers-context" class="level3">
 <h3 class="anchored" data-anchor-id="writing-the-teachers-context">Writing the teacher’s context</h3>
 <p>The teacher must use the extra information without changing its style. We compare two contexts: the template of the OPSD paper (<em>“Here is a reference solution: …”</em>), and a conversation in which the same question was already answered correctly, in an earlier turn.</p>
-<div id="2a76d0d0" class="cell" data-execution_count="27">
+<div id="2a76d0d0" class="cell" data-execution_count="28">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb54"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb54-1"><a href="#cb54-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> paper_context(question, answer):</span>
 <span id="cb54-2"><a href="#cb54-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> chat(<span class="ss">f&quot;</span><span class="sc">{</span>question<span class="sc">}</span><span class="ch">\n</span><span class="ss">Here is a reference solution: </span><span class="sc">{</span>answer<span class="sc">}</span><span class="ss">.</span><span class="ch">\n</span><span class="ss">After understanding the reference solution, answer the question.&quot;</span>)</span>
 <span id="cb54-3"><a href="#cb54-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -4930,7 +4935,7 @@ teacher with the earlier turn  : greedy accuracy 98%, e.g. [&#39;16 + 44 = 60&#3
 </section>
 <section id="distillation-on-the-students-own-answers" class="level3">
 <h3 class="anchored" data-anchor-id="distillation-on-the-students-own-answers">Distillation on the student’s own answers</h3>
-<div id="7ddbf5c6" class="cell" data-execution_count="28">
+<div id="7ddbf5c6" class="cell" data-execution_count="29">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb56"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb56-1"><a href="#cb56-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> completion_log_softmax(model, prompt_ids, prompt_mask, completion):</span>
 <span id="cb56-2"><a href="#cb56-2" aria-hidden="true" tabindex="-1"></a>    full <span class="op">=</span> torch.cat([prompt_ids, completion], <span class="dv">1</span>)</span>
 <span id="cb56-3"><a href="#cb56-3" aria-hidden="true" tabindex="-1"></a>    attention <span class="op">=</span> torch.cat([prompt_mask, torch.ones_like(completion)], <span class="dv">1</span>)</span>
@@ -5000,7 +5005,7 @@ teacher with the earlier turn  : greedy accuracy 98%, e.g. [&#39;16 + 44 = 60&#3
 </div>
 <p>With the same 32 samples per step as GRPO, self-distillation raises the accuracy on the held-out additions further, to 86% against 79% in this run, and the answers keep the style of the initial model, <code>16 + 44 = 60</code>: the teacher writes like the student, so nothing pushes towards a bare number. No reward is computed and each problem gets a single answer, but every token of this answer receives a target distribution from a teacher that is right 98% of the time. On a wrong answer, the teacher puts its mass on the correct digit at the position where the student went wrong, while GRPO only learns that the whole answer scored less than the others of its group.</p>
 <p>The comparison favours self-distillation on this task, since the model reads the answer almost perfectly when it is given in the right form. On problems where the model cannot make use of the reference solution, the teacher knows no more than the student. And the student learns whatever the teacher does differently: with the template of the paper, it would learn to write explanations rather than to add.</p>
-<div id="d77c460c" class="cell" data-execution_count="29">
+<div id="d77c460c" class="cell" data-execution_count="30">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb59"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb59-1"><a href="#cb59-1" aria-hidden="true" tabindex="-1"></a><span class="kw">del</span> student, teacher, optimizer</span>
 <span id="cb59-2"><a href="#cb59-2" aria-hidden="true" tabindex="-1"></a>free_memory()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
@@ -5034,7 +5039,7 @@ teacher with the earlier turn  : greedy accuracy 98%, e.g. [&#39;16 + 44 = 60&#3
 </section>
 <section id="lora-implementation" class="level2">
 <h2 class="anchored" data-anchor-id="lora-implementation">LoRA implementation</h2>
-<div id="a52bfcb3" class="cell" data-class-source="hide-on-slides" data-execution_count="30">
+<div id="a52bfcb3" class="cell" data-class-source="hide-on-slides" data-execution_count="31">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb60"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb60-1"><a href="#cb60-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> LoRALinear(nn.Module):</span>
 <span id="cb60-2"><a href="#cb60-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, original, rank<span class="op">=</span><span class="dv">8</span>, alpha<span class="op">=</span><span class="dv">16</span>):</span>
 <span id="cb60-3"><a href="#cb60-3" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>()</span>
@@ -5072,7 +5077,7 @@ rank= 64:  524,288 trainable /   16,777,216 total (3.12%)</code></pre>
 <section id="which-matrices-to-apply-lora-to" class="level2">
 <h2 class="anchored" data-anchor-id="which-matrices-to-apply-lora-to">Which matrices to apply LoRA to</h2>
 <p>In a transformer, LoRA is typically applied to the <strong>attention projection matrices</strong> (<span class="math inline">W_Q, W_K, W_V, W_O</span>) and sometimes the MLP layers.</p>
-<div id="987acf64" class="cell" data-execution_count="31">
+<div id="987acf64" class="cell" data-execution_count="32">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb62"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb62-1"><a href="#cb62-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> peft <span class="im">import</span> LoraConfig, get_peft_model</span>
 <span id="cb62-2"><a href="#cb62-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> transformers <span class="im">import</span> AutoModelForCausalLM</span>
 <span id="cb62-3"><a href="#cb62-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -5172,7 +5177,7 @@ rank= 64:  524,288 trainable /   16,777,216 total (3.12%)</code></pre>
 <ul>
 <li>The reference model comes for free: <span class="math inline">\pi_{\text{ref}}</span> is the base model with the adapter switched off.</li>
 </ul>
-<p>The variant matters. On R1-Distill-Qwen-1.5B, at 40.5 before RL: DoRA 46.6, full 44.9, LoRA 42.5, rank-1 LoRA 40.5, PiSSA 0.2 (<a href="https://www.alphaxiv.org/abs/2512.23165">Yin et al., 2025</a>).</p>
+<p><a href="https://www.alphaxiv.org/abs/2512.23165">Yin et al. (2025)</a> compare the variants of LoRA in RL. On R1-Distill-Qwen-1.5B, at 40.5 before RL: DoRA 46.6, full 44.9, LoRA 42.5, rank-1 LoRA 40.5, PiSSA 0.2.</p>
 <p>The argument of <a href="https://thinkingmachines.ai/blog/lora/">Schulman et al.</a> (2025, <em>LoRA Without Regret</em>, Thinking Machines) is information-theoretic. Policy-gradient learning is driven by the advantage, about one number per answer, so training on 10,000 MATH problems with 32 answers each gives at most about 320,000 bits, while a rank-1 adapter of Llama-3.1-8B already has 3 million parameters. The same study gives practical rules that hold for SFT and RL: apply LoRA to all the layers, the MLP included, since attention-only LoRA underperforms; use a learning rate about 10 times larger than for full fine-tuning; and avoid very large batches, which hurt LoRA more than full fine-tuning. In SFT, LoRA matches full fine-tuning as long as the dataset fits in the capacity of the adapter, which is the regime of the previous slide.</p>
 <p>The free reference matters for memory: RLHF and GRPO need the policy and the reference, and DPO needs the reference too. With a full fine-tuning, these are two copies of the model; with LoRA, the reference is the same weights with the adapter disabled, which is what TRL does for its GRPO and DPO trainers. The same property makes LoRA attractive for training services: the Tinker API of Thinking Machines trains only LoRA adapters, so that many runs, RL included, share the same base model on the same GPUs.</p>
 <p>The comparison of <a href="https://www.alphaxiv.org/abs/2512.23165">Yin et al. (2025)</a> trains DeepSeek-R1-Distill-Qwen-1.5B with DAPO and LoRA of rank 32, averaged over six math benchmarks. The model scores 40.5 before training. DoRA, which learns a separate magnitude for each column, beats full fine-tuning; plain LoRA keeps about half of the gain of full fine-tuning; and the rank-1 LoRA stays at 40.5: in this setting, a distilled reasoning model on competition math, it learns nothing, contrary to the results of Schulman et al. The real failures are PiSSA and MiLoRA (18.0), which initialise the adapter from the singular value decomposition of the weights, along the top or the bottom singular directions; such initialisations help SFT. <a href="https://www.alphaxiv.org/abs/2511.08567">Zhu et al. (2025)</a> explain why they hurt RL: the updates of RLVR avoid the principal directions of the weights and preserve their spectrum, while SFT modifies them. LoRA is therefore at least as natural for RL as for SFT, but the variants designed for SFT do not carry over.</p>
@@ -5185,7 +5190,7 @@ rank= 64:  524,288 trainable /   16,777,216 total (3.12%)</code></pre>
 <section id="lora-from-scratch" class="level3">
 <h3 class="anchored" data-anchor-id="lora-from-scratch">LoRA from scratch</h3>
 <p>The same layer as on the slides, which also freezes the bias of the original layer, on a matrix of the size of BERT-base.</p>
-<div id="695e91e4" class="cell" data-execution_count="32">
+<div id="695e91e4" class="cell" data-execution_count="33">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb64"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb64-1"><a href="#cb64-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> LoRALinear(nn.Module):</span>
 <span id="cb64-2"><a href="#cb64-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, original: nn.Linear, rank: <span class="bu">int</span> <span class="op">=</span> <span class="dv">8</span>, alpha: <span class="bu">int</span> <span class="op">=</span> <span class="dv">16</span>):</span>
 <span id="cb64-3"><a href="#cb64-3" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>()</span>
@@ -5228,7 +5233,7 @@ rank= 64:  524,288 trainable /   16,777,216 total (3.12%)</code></pre>
 </section>
 <section id="lora-with-peft-recommended" class="level3">
 <h3 class="anchored" data-anchor-id="lora-with-peft-recommended">LoRA with PEFT (recommended)</h3>
-<div id="3fecc44b" class="cell" data-execution_count="33">
+<div id="3fecc44b" class="cell" data-execution_count="34">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb66"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb66-1"><a href="#cb66-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> peft <span class="im">import</span> LoraConfig, get_peft_model</span>
 <span id="cb66-2"><a href="#cb66-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb66-3"><a href="#cb66-3" aria-hidden="true" tabindex="-1"></a>base <span class="op">=</span> AutoModelForCausalLM.from_pretrained(BASE_MODEL, dtype<span class="op">=</span>torch.bfloat16)</span>
@@ -5251,7 +5256,7 @@ rank= 64:  524,288 trainable /   16,777,216 total (3.12%)</code></pre>
 <section id="training-with-lora" class="level3">
 <h3 class="anchored" data-anchor-id="training-with-lora">Training with LoRA</h3>
 <p>We train the base model with LoRA on the SFT dataset, and compare with the full fine-tuning of the SFT part.</p>
-<div id="144fe3cf" class="cell" data-execution_count="34">
+<div id="144fe3cf" class="cell" data-execution_count="35">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb68"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb68-1"><a href="#cb68-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> trl <span class="im">import</span> SFTTrainer, SFTConfig</span>
 <span id="cb68-2"><a href="#cb68-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb68-3"><a href="#cb68-3" aria-hidden="true" tabindex="-1"></a>lora_model <span class="op">=</span> lora_model.to(device)</span>
@@ -5292,7 +5297,7 @@ rank= 64:  524,288 trainable /   16,777,216 total (3.12%)</code></pre>
 Done. Final loss: 1.8829</code></pre>
 </div>
 </div>
-<div id="1f6cd302" class="cell" data-execution_count="35">
+<div id="1f6cd302" class="cell" data-execution_count="36">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb70"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb70-1"><a href="#cb70-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Compare loss curves: full SFT vs LoRA</span></span>
 <span id="cb70-2"><a href="#cb70-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_curve(history):</span>
 <span id="cb70-3"><a href="#cb70-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> [x[<span class="st">&quot;step&quot;</span>] <span class="cf">for</span> x <span class="kw">in</span> history <span class="cf">if</span> <span class="st">&quot;loss&quot;</span> <span class="kw">in</span> x], [x[<span class="st">&quot;loss&quot;</span>] <span class="cf">for</span> x <span class="kw">in</span> history <span class="cf">if</span> <span class="st">&quot;loss&quot;</span> <span class="kw">in</span> x]</span>
@@ -5318,7 +5323,7 @@ Done. Final loss: 1.8829</code></pre>
 </section>
 <section id="merging-lora-back-into-the-base-weights" class="level3">
 <h3 class="anchored" data-anchor-id="merging-lora-back-into-the-base-weights">Merging LoRA back into the base weights</h3>
-<div id="4012d297" class="cell" data-execution_count="36">
+<div id="4012d297" class="cell" data-execution_count="37">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb71"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb71-1"><a href="#cb71-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Merge adapter → plain model, zero inference overhead</span></span>
 <span id="cb71-2"><a href="#cb71-2" aria-hidden="true" tabindex="-1"></a>merged_model <span class="op">=</span> lora_model.merge_and_unload().to(device).<span class="bu">eval</span>()</span>
 <span id="cb71-3"><a href="#cb71-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">&quot;Type after merge:&quot;</span>, <span class="bu">type</span>(merged_model).<span class="va">__name__</span>)</span>
@@ -5377,7 +5382,7 @@ A: The capital of France is Paris.</code></pre>
 <h2 class="lab anchored" data-anchor-id="lab-arena">Lab: arena leaderboards are Bradley-Terry fits</h2>
 <p><em>This part runs in the notebook: </em><a href="https://colab.research.google.com/github/nathanael-fijalkow/LLM-Course/blob/main/notebooks/05_post_training.ipynb">open it in Colab</a> or <a href="https://github.com/nathanael-fijalkow/LLM-Course/blob/main/notebooks/05_post_training.ipynb">view it on GitHub</a>.</p>
 <p>LMArena collects anonymous pairwise votes between models and fits one score per model with the same model, <span class="math inline">P(m_1 \succ m_2) = \sigma(s_{m_1} - s_{m_2})</span>, reported on the Elo scale (<span class="math inline">400 / \ln 10</span> points per unit of <span class="math inline">s</span>, plus an offset). We simulate 4,000 battles between 6 models with known strengths, fit the scores by maximum likelihood, and compute confidence intervals by bootstrap.</p>
-<div id="eb29d894" class="cell" data-execution_count="37">
+<div id="eb29d894" class="cell" data-execution_count="38">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb73"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb73-1"><a href="#cb73-1" aria-hidden="true" tabindex="-1"></a>MODELS <span class="op">=</span> [<span class="st">&quot;model A&quot;</span>, <span class="st">&quot;model B&quot;</span>, <span class="st">&quot;model C&quot;</span>, <span class="st">&quot;model D&quot;</span>, <span class="st">&quot;model E&quot;</span>, <span class="st">&quot;model F&quot;</span>]</span>
 <span id="cb73-2"><a href="#cb73-2" aria-hidden="true" tabindex="-1"></a>true_strength <span class="op">=</span> np.array([<span class="fl">1.2</span>, <span class="fl">0.9</span>, <span class="fl">0.6</span>, <span class="fl">0.5</span>, <span class="fl">0.0</span>, <span class="op">-</span><span class="fl">0.4</span>])</span>
 <span id="cb73-3"><a href="#cb73-3" aria-hidden="true" tabindex="-1"></a>rng <span class="op">=</span> np.random.default_rng(<span class="dv">0</span>)</span>
@@ -5428,7 +5433,7 @@ model F                     -0.87         -0.83   855.17       [837, 871]</code>
 </div>
 <p>The fit recovers the strengths, and the bootstrap intervals show which differences are significant: models C and D, whose true strengths differ by 0.1, have intervals that almost touch: with 4,000 votes, they can barely be ranked against each other.</p>
 <p><strong>Goodhart’s law in an arena.</strong> Suppose voters also like long answers, and model F learns to write twice as much: each of its battles gets a bonus of 0.5 in the logit, unrelated to quality.</p>
-<div id="43153d03" class="cell" data-execution_count="38">
+<div id="43153d03" class="cell" data-execution_count="39">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb75"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb75-1"><a href="#cb75-1" aria-hidden="true" tabindex="-1"></a>style_bonus <span class="op">=</span> np.zeros(<span class="bu">len</span>(MODELS))</span>
 <span id="cb75-2"><a href="#cb75-2" aria-hidden="true" tabindex="-1"></a>style_bonus[MODELS.index(<span class="st">&quot;model F&quot;</span>)] <span class="op">=</span> <span class="fl">0.5</span>                  <span class="co"># longer answers win votes, whatever their quality</span></span>
 <span id="cb75-3"><a href="#cb75-3" aria-hidden="true" tabindex="-1"></a>p_biased <span class="op">=</span> <span class="dv">1</span> <span class="op">/</span> (<span class="dv">1</span> <span class="op">+</span> np.exp(<span class="op">-</span>((true_strength <span class="op">+</span> style_bonus)[pairs[:, <span class="dv">0</span>]] <span class="op">-</span> (true_strength <span class="op">+</span> style_bonus)[pairs[:, <span class="dv">1</span>]])))</span>
@@ -5500,7 +5505,7 @@ model F              855.0                          926.0</code></pre>
 <h2 class="lab anchored" data-anchor-id="lab-compare">Lab: comparing the models</h2>
 <p><em>This part runs in the notebook: </em><a href="https://colab.research.google.com/github/nathanael-fijalkow/LLM-Course/blob/main/notebooks/05_post_training.ipynb">open it in Colab</a> or <a href="https://github.com/nathanael-fijalkow/LLM-Course/blob/main/notebooks/05_post_training.ipynb">view it on GitHub</a>.</p>
 <p>The same questions, answered by the models of the lab: full SFT, DPO on top of SFT, SFT with LoRA, and the instruct model of Hugging Face as a reference.</p>
-<div id="42a038d1" class="cell" data-execution_count="39">
+<div id="42a038d1" class="cell" data-execution_count="40">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb77"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb77-1"><a href="#cb77-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> compare(question):</span>
 <span id="cb77-2"><a href="#cb77-2" aria-hidden="true" tabindex="-1"></a>    prompt <span class="op">=</span> sft_tokenizer.apply_chat_template(</span>
 <span id="cb77-3"><a href="#cb77-3" aria-hidden="true" tabindex="-1"></a>        [{<span class="st">&quot;role&quot;</span>:<span class="st">&quot;system&quot;</span>,<span class="st">&quot;content&quot;</span>:<span class="st">&quot;You are a helpful assistant.&quot;</span>},</span>
