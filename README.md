@@ -19,7 +19,7 @@ David's lectures come as slides in PDF. Nath's lectures come as slides, lecture 
 | 1 | October 1 | David | Language models | [Slides (PDF)](david/lecture01.pdf), [Hugging Face Space: NLP before LLMs](https://huggingface.co/spaces/dlouapre/nlp-before-llms) |
 | 2 | October 29 | Nath | Transformers | [Slides: perspectives on generative AI](slides/00_perspectives.html), [Slides: Transformers 101](slides/01_transformers_101.html), [Lecture notes](notes/01_transformers_101.html), [Notebook](notebooks/01_transformers_101.ipynb) |
 | 3 | November 5 | David | Pre-training and scaling laws | [Slides, part 1 (PDF)](david/lecture03_part1.pdf), [Slides, part 2 (PDF)](david/lecture03_part2.pdf) |
-| 4 | November 12 | Nath | Post-training and alignment | [Slides](slides/05_post_training.html), [Lecture notes](notes/05_post_training.html), [Notebook](notebooks/05_post_training.ipynb) |
+| 4 | November 12 | Nath | Post-training and alignment | [Slides](slides/05_post_training.html), [Lecture notes](notes/05_post_training.html), [Notebook](notebooks/05_post_training.ipynb), [Recording](https://u-bordeaux-fr.zoom.us/rec/share/agRYane6iPKXA_tI-lM_APGbIR0ylmINIZIhQIYxUcrbloPv9AWdYwaLlba59Al6.2g4tdldzsOtG6h1B) (passcode: `=S3^kc2U`) |
 | 5 | November 19 | David | Decoding and inference optimization | |
 | 6 | November 26 | Nath | Advanced architectures | |
 | 7 | December 3 | David | Agents | |
