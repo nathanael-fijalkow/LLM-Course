@@ -22,6 +22,7 @@ format:
     toc-depth: 2
     format-links: false   # formats.lua adds links that survive the move to notes/
     code-overflow: wrap
+    link-external-newwindow: true
     execute:
       cache: true
   ipynb:
@@ -33,6 +34,7 @@ format:
     embed-resources: true
     theme: moon
     slide-number: true
+    link-external-newwindow: true
     smaller: true
     css: custom.css
     scrollable: true
@@ -53,7 +55,7 @@ This notebook goes with the fifth lecture of the course. It runs the methods of 
 ::: lecture
 These notes follow the slides of the fifth lecture and add the explanations given in class. The lecture is organised by the kind of data available: first the methods that learn from labels (Section 2), then reinforcement learning, sorted by the kind of reward (Sections 3 to 7). Each part of the lab comes after the part of the lecture it illustrates: we fine-tune a model of 135M parameters with supervised fine-tuning, DPO, GRPO, on-policy self-distillation and LoRA, train a reward model on its hidden states, and fit an arena leaderboard. The code and its results are shown in full; the notebook contains the same code, ready to run.
 
-Twelve interview questions, of the kind asked for machine learning engineer and research positions, are spread over the lecture. They are framed in orange, and each is followed by a detailed answer and discussion, folded so that you can think about the question first.
+Eleven interview questions, of the kind asked for machine learning engineer and research positions, are spread over the lecture. They are framed in orange, and each is followed by a detailed answer and discussion, folded so that you can think about the question first.
 :::
 
 ::: slides
@@ -91,6 +93,38 @@ from transformers import AutoTokenizer
 
 ```
 
+# Prerequisite: KL divergence
+<!-- type: content -->
+
+For two probability distributions $P$ and $Q$ over the same space:
+$$\mathrm{KL}(P \| Q) = \mathbb{E}_{x \sim P}\!\left[\log \frac{P(x)}{Q(x)}\right] = \sum_x P(x) \log \frac{P(x)}{Q(x)}$$
+
+- $\log \frac{P(x)}{Q(x)}$ compares how likely $x$ is under $P$ and under $Q$; the KL averages it over samples of $P$.
+- It is large when $Q$ gives a low probability to what $P$ often produces.
+- Non-negative: $\mathrm{KL}(P \| Q) \geq 0$, with equality if and only if $P = Q$.
+- Asymmetric: $\mathrm{KL}(P \| Q) \neq \mathrm{KL}(Q \| P)$ in general.
+
+::: lecture
+The KL divergence will appear throughout the lecture, in the loss of supervised fine-tuning, in the objective of reinforcement learning and in distillation. In information theory, it is the number of extra nats (or bits, with the logarithm in base 2) needed to encode samples of $P$ with a code designed for $Q$ instead of a code designed for $P$: $\mathrm{KL}(P \| Q) = H(P, Q) - H(P)$, the cross-entropy minus the entropy. Non-negativity follows from Jensen's inequality applied to the concave logarithm. The KL is not a distance: it is not symmetric and does not satisfy the triangle inequality.
+:::
+
+## KL divergence: examples
+<!-- type: example -->
+
+The two distributions play different roles: $P$ is the **reference**, $Q$ is the **model** being learned. Next token after *"My favourite city is"*:
+
+![](figs/kl_examples.svg){fig-align="center"}
+
+. . .
+
+> $\mathrm{KL}(P \| Q)$ is small when $Q$ is close to $P$, and infinite as soon as $Q$ never produces an answer that $P$ produces.
+
+::: lecture
+The values use the natural logarithm: from left to right, $0.5 \log \frac{0.5}{0.6} + 0.5 \log \frac{0.5}{0.4} \approx 0.02$, then $0.5 \log \frac{0.5}{0.9} + 0.5 \log \frac{0.5}{0.1} \approx 0.51$, then $+\infty$, since the term of Lyon is $0.5 \log \frac{0.5}{0}$. Most of the divergence comes from Lyon, the answer that the model underestimates: in this direction, the KL forces the model to cover every answer of the reference.
+
+The roles can also be swapped, and both directions appear in this lecture. In SFT (Section 2), the cross-entropy minimises the KL from the data to the model, since $H(p_{\text{data}}, p_\theta) = H(p_{\text{data}}) + \mathrm{KL}(p_{\text{data}} \,\|\, p_\theta)$ and the entropy of the data does not depend on $\theta$. This KL heavily penalises a model that gives a low probability to an answer of the data: it is *mode-covering*. In RL (Section 3), the KL goes from the policy to the reference, and the expectation is taken over the answers of the policy: the policy may drop most of the answers of the reference and keep a few, but it is penalised for producing answers that the reference finds very unlikely. This direction is *mode-seeking*. The difference explains why RL lowers the entropy of the model (Section 5), and it returns in Section 7, where a student can be distilled in either direction.
+:::
+
 # 0. Lifecycle of a Language Model
 <!-- type: content -->
 
@@ -111,9 +145,9 @@ The previous parts of the course built the architecture (Parts 1 and 2), the tok
 
 Train on hundreds of billions to trillions of tokens with **next-token prediction**.
 
-- The model learns the structure of language, facts about the world, and some reasoning.
-- The compute is large: hundreds to thousands of GPU-days, often far more.
-- The result is a **base model**: a good text predictor, but not yet an assistant.
+- The model learns the structure of language, facts about the world, and some form of reasoning.
+- The compute is large: over thousands of GPU-days.
+- The result is a **base model**, also called **foundation model**: it can generate text but not solve tasks.
 
 ::: lecture
 Almost everything the model knows is acquired during pre-training. Post-training changes the behaviour of the model much more than its knowledge: it selects, among all the continuations the base model finds plausible, those that an assistant should produce.
@@ -131,7 +165,7 @@ Almost everything the model knows is acquired during pre-training. Post-training
   Llama 4 Maverick         2025   400B (MoE)   22T
 
 ::: lecture
-The number of training tokens has grown faster than the number of parameters. The Chinchilla analysis (Hoffmann et al., 2022) suggested about 20 tokens per parameter for a compute-optimal model; Llama 3 405B was trained on nearly 40 tokens per parameter, and smaller models are trained far beyond that ratio, because a smaller model is cheaper to serve. For the mixtures of experts (MoE), only a fraction of the parameters is active for each token.
+The number of training tokens has grown faster than the number of parameters. The Chinchilla analysis ([Hoffmann et al., 2022](https://www.alphaxiv.org/abs/2203.15556)) suggested about 20 tokens per parameter for a compute-optimal model; Llama 3 405B was trained on nearly 40 tokens per parameter, and smaller models are trained far beyond that ratio, because a smaller model is cheaper to serve. For the mixtures of experts (MoE), only a fraction of the parameters is active for each token.
 :::
 
 ## Post-training
@@ -145,17 +179,17 @@ Post-training turns the base model into an assistant. What it can do depends on 
 It costs far less compute than pre-training.
 
 ::: lecture
-To give an order of magnitude, the technical report of DeepSeek-V3 (2024) counts about 2.7 million H800 GPU hours for pre-training and about 5,000 for post-training. This ratio is changing with reasoning models, whose reinforcement learning phase can take a large share of the total budget. Post-training also relies on data that is expensive to produce: demonstrations written by experts, comparisons made by annotators, problems with checked answers, or the outputs of stronger models. The lecture is organised by this data: what we can do with labels (Section 2), then with rewards of different kinds (Sections 3 to 7).
+To give an order of magnitude, the technical report of [DeepSeek-V3](https://www.alphaxiv.org/abs/2412.19437) (2024) counts about 2.7 million H800 GPU hours for pre-training and about 5,000 for post-training. This ratio is changing with reasoning models, whose reinforcement learning phase can take a large share of the total budget. Post-training also relies on data that is expensive to produce: demonstrations written by experts, comparisons made by annotators, problems with checked answers, or the outputs of stronger models. The lecture is organised by this data: what we can do with labels (Section 2), then with rewards of different kinds (Sections 3 to 7).
 :::
 
 # 1. What is Alignment?
 <!-- type: content -->
 
-A **base model** completes text. Ask it *"What is the capital of France?"* and it might reply:
+A **base model** completes text, it cannot solve tasks. If we ask *"What is the capital of France?"*, it might reply:
 
 > *"...is a question often posed on French geography quizzes. The answer, of course, depends on the era..."*
 
-The model does not try to help: it continues the text the way similar texts continued in its training data.
+It continues the text the way similar texts continued in its training data.
 
 ::: lecture
 On the web, a question is often followed by other questions (a quiz, a forum thread, an exam), or by an article that discusses it. A base model reproduces these patterns. The lab shows the difference on a small model: the base model and its instruct version give very different continuations of the same prompt.
@@ -164,17 +198,9 @@ On the web, a question is often followed by other questions (a quiz, a forum thr
 ## The alignment problem
 <!-- type: content -->
 
-Three ways a base model fails:
+**Alignment** trains the model to be **helpful, harmless and honest** (the "3 H" of [Askell et al., 2021](https://www.alphaxiv.org/abs/2112.00861)).
 
-| Failure | Example |
-|---------|---------|
-| Unhelpful | continues a question instead of answering it |
-| Harmful | gives instructions for dangerous activities when asked |
-| Dishonest | states false information with confidence ("hallucination") |
-
-. . .
-
-**Alignment** trains the model to be **helpful, harmless and honest** (the "3 H" of Askell et al., 2021).
+> These three objectives are very hard to define mathematically.
 
 ::: lecture
 The three criteria can conflict: the most helpful answer to a dangerous request is a harmful one, and a model that refuses everything is harmless but useless. Post-training has to find a balance, and most of the methods of this lecture learn it from human judgements rather than from explicit rules.
@@ -200,7 +226,8 @@ The capital of France is Paris.
 . . .
 
 This is the **ChatML** format (Qwen, SmolLM, ...). Llama 2 used `[INST]...[/INST]` instead.
-A prompt in the wrong template puts the model out of distribution, and the answers degrade.
+
+If we do not follow the model's format, we typically get very degraded answers.
 
 ::: lecture
 The markers `<|im_start|>` and `<|im_end|>` are special tokens: each is a single token of the vocabulary, which no ordinary text can produce. The **system** message sets the behaviour of the assistant, the **user** and **assistant** messages alternate, and generation stops when the model produces `<|im_end|>`. The template is stored with the tokenizer, as a small Jinja program, so that the formatting used at inference is exactly the one seen during fine-tuning.
@@ -234,23 +261,21 @@ The model then **continues** from the assistant marker.
 
 You fine-tune a base model on conversations formatted with the ChatML template. At inference, the model answers correctly, but then goes on: it writes a new user turn, answers it, and only stops at `max_new_tokens`.
 
-What are the likely causes, and how would you find the right one?
+What are the likely causes? How do you fix this?
 
 ::: answer
-**What should stop the generation.** Generation stops when the model samples a token that the decoding loop treats as a stop token; for a chat model, this is the end-of-turn token, `<|im_end|>` in ChatML. Two conditions must hold: the model must have learned to produce this token, with high probability, at the end of its answers, and the inference code must stop on it. One of the two fails here. The fact that the model writes a plausible user turn shows that it has learned the template, but not where its own turn ends.
+**What should stop the generation.** Generation stops when the model samples a token that the decoding loop treats as a stop token; for a chat model, this is the end-of-turn token, `<|im_end|>` in ChatML. Two conditions must hold: the model must have learned to produce this token, with high probability, at the end of its answers, and the inference code must stop on it. One of the two fails here. The fact that the model writes a plausible user turn shows that it has learned the template but not where its own turn ends.
 
 **Causes on the training side.**
 
 - **The end-of-turn token is masked.** Loss masking (Section 2) must train on the assistant tokens *including* the closing `<|im_end|>`. A masking function that only keeps the text between the markers never teaches the model to close its turn.
-- **The padding token is the end token.** The common line `tokenizer.pad_token = tokenizer.eos_token`, combined with a data collator that sets the label of every padding token to $-100$, also masks the genuine end tokens, since the collator cannot tell them apart from padding. The model then sees thousands of answers and not a single one that ends. The fix is a dedicated padding token, or a mask built from the lengths of the sequences rather than from the token ids.
+- **The padding token is the end token.** The common line `tokenizer.pad_token = tokenizer.eos_token`, combined with a data collator that sets the label of every padding token to $-100$, also masks the genuine end tokens, since the collator cannot tell them apart from padding. The model does not see answers with an end. The fix is a dedicated padding token, or a mask built from the lengths of the sequences rather than from the token ids.
 - **The end token is new.** If the template uses special tokens that the base model does not have, their embeddings are added to the vocabulary with an arbitrary initialisation and must be trained. With LoRA, the embedding and output layers are frozen by default, so the model cannot learn to produce a token whose row of the output layer was never trained; with PEFT, these layers must be listed in `modules_to_save`.
 - **Truncation and packing.** Examples cut at `max_length` lose their end token, so a dataset of long answers may contain few ends; and conversations packed into one sequence without an end token between them (next question) teach the model that a conversation continues with another one.
 
 **Causes on the inference side.** The model may produce the end token while the code does not stop on it. The stop tokens come from `generation_config.eos_token_id`, which often refers to the end-of-text token of pre-training rather than to the end-of-turn token of the template. Llama 3, for instance, ends a turn with `<|eot_id|>` and a document with `<|end_of_text|>`: code that stops only on the latter never stops after an answer. Decoding with `skip_special_tokens=True` hides the problem, since the end token disappears from the printed text. Finally, the template used at inference must be exactly the one of training, with the same system message, the same newlines and the generation prompt `<|im_start|>assistant` added by `add_generation_prompt=True`: any mismatch puts the model out of distribution.
 
-**How to find the right one.** Two cheap checks separate the cases. First, decode one training batch with its labels, token by token, and look at which tokens are trained: this shows at once whether the closing `<|im_end|>` is. Second, give the model a prompt followed by a complete answer and read the probability it assigns to `<|im_end|>` at the end. If this probability is high, the model is fine and the stopping criterion is wrong; if it is low, the problem is in the training data or the masking. The `generate` function of the lab below passes the end-of-turn token explicitly as a stop token, for the same reason.
-
-**Going further.** A base model shows the same behaviour for a different reason: it was never trained on the template, and continues a conversation as it would continue a forum thread (Section 1). The general lesson is that most failures of fine-tuning come from the data pipeline rather than from the model, and that printing the exact tokens and labels the model is trained on is the first debugging step, before any change of hyperparameters.
+**How to find the right one.** First, decode one training batch with its labels, token by token, and look at which tokens are trained: this shows whether the closing `<|im_end|>` appears. Second, give the model a prompt followed by a complete answer and read the probability it assigns to `<|im_end|>` at the end. If this probability is high, the model is fine and the stopping criterion is wrong; if it is low, the problem is in the training data or the masking. The `generate` function of the lab below passes the end-of-turn token explicitly as a stop token, for the same reason.
 :::
 
 ::: {.lecture .notebook}
@@ -388,7 +413,7 @@ The method depends on the kind of label:
 | Label | Example | Method |
 |---|---|---|
 | answer written by a human | InstructGPT | supervised fine-tuning (SFT) |
-| answer of a stronger model | Alpaca, distilled R1 | SFT (sequence-level distillation) |
+| answer of a stronger model | Alpaca, distilled from R1 | SFT (sequence-level distillation) |
 | answer of the model itself, kept by a checker | STaR, Llama 3 | rejection sampling fine-tuning |
 | full distribution of a teacher | Gemma 2 | logit distillation |
 | the better of two answers | UltraFeedback | DPO (Section 4) |
@@ -403,9 +428,9 @@ In all these methods the training data is fixed before training starts, or at le
 
 Train on (prompt, answer) pairs, with the loss of pre-training: *given this conversation, predict the tokens of the answer*.
 
-- **Quality matters more than quantity**: 1,000 good examples can beat 50,000 mediocre ones.
+- **Quality matters more than quantity**: 1,000 good examples is better than 50,000 mediocre ones.
 - **Loss masking**: the cross-entropy is computed on the answer tokens only.
-- **Limit**: the model learns to imitate. It never sees its own mistakes.
+- **Limit**: the model learns to imitate, it never sees its own mistakes.
 
 ::: lecture
 SFT is the same training as pre-training, next-token prediction with the cross-entropy loss, on a different kind of data: conversations formatted with the chat template, in which the assistant turns are written the way we want the model to answer. A few thousand examples are enough to teach the format and the tone of an assistant, because the base model already has the knowledge; SFT mostly teaches it which of its abilities to use.
@@ -414,17 +439,20 @@ SFT is the same training as pre-training, next-token prediction with the cross-e
 ## Where does SFT data come from?
 <!-- type: content -->
 
-- **Human demonstrations**: InstructGPT (2022) used about 13,000 prompts with answers written by labelers.
-- **Synthetic data**: Self-Instruct and Alpaca (2023) generated 52,000 instructions and answers with a stronger model, for a few hundred dollars.
-- **Small but curated**: LIMA (2023) fine-tuned a 65B model on **1,000** carefully chosen examples, with results competitive with much larger datasets.
-- **Open recipes**: Tülu 3 (2024) publishes data, code and evaluations for the full post-training pipeline.
+- **Human demonstrations**: [InstructGPT](https://www.alphaxiv.org/abs/2203.02155) (2022) used about 13,000 prompts with answers written by labelers.
+- **Synthetic data**: [Self-Instruct](https://www.alphaxiv.org/abs/2212.10560) and [Alpaca](https://crfm.stanford.edu/2023/03/13/alpaca.html) (2023) generated 52,000 instructions and answers with a stronger model, for a few hundred dollars.
+- **From principles**: [Constitutional AI](https://www.alphaxiv.org/abs/2212.08073) (2022): the model answers, critiques its answer against a written principle and revises it; the revisions become the SFT data.
+- **Small but curated**: [LIMA](https://www.alphaxiv.org/abs/2305.11206) (2023) fine-tuned a 65B model on **1,000** carefully chosen examples, with results competitive with much larger datasets.
+- **Open recipes**: [Tülu 3](https://www.alphaxiv.org/abs/2411.15124) (2024) publishes data, code and evaluations for the full post-training pipeline.
 
 . . .
 
 Today, most SFT data is generated or filtered by other models: post-training is largely **distillation** from stronger models.
 
 ::: lecture
-The papers are Ouyang et al. (2022) for InstructGPT, Wang et al. (2023) for Self-Instruct, Taori et al. (2023) for Alpaca, Zhou et al. (2023) for LIMA and Lambert et al. (2024) for Tülu 3. LIMA formulated the *superficial alignment hypothesis*: the knowledge of the model comes from pre-training, and alignment only teaches it the format in which to present it. SFT on the answers of a stronger model is called *sequence-level distillation* (Kim and Rush, 2016): the student imitates the outputs of the teacher, one sampled answer per prompt. The terms of use of several commercial models forbid using their outputs to train competing models.
+The papers are [Ouyang et al. (2022)](https://www.alphaxiv.org/abs/2203.02155) for InstructGPT, [Wang et al. (2023)](https://www.alphaxiv.org/abs/2212.10560) for Self-Instruct, [Taori et al. (2023)](https://crfm.stanford.edu/2023/03/13/alpaca.html) for Alpaca, [Zhou et al. (2023)](https://www.alphaxiv.org/abs/2305.11206) for LIMA and [Lambert et al. (2024)](https://www.alphaxiv.org/abs/2411.15124) for Tülu 3. LIMA formulated the *superficial alignment hypothesis*: the knowledge of the model comes from pre-training, and alignment only teaches it the format in which to present it. SFT on the answers of a stronger model is called *sequence-level distillation* ([Kim and Rush, 2016](https://www.alphaxiv.org/abs/1606.07947)): the student imitates the outputs of the teacher, one sampled answer per prompt. The terms of use of several commercial models forbid using their outputs to train competing models.
+
+Constitutional AI ([Bai et al., 2022](https://www.alphaxiv.org/abs/2212.08073)) replaces human demonstrations by a short list of written principles, the constitution. In its supervised phase, a helpful model answers prompts designed to elicit harmful answers, then critiques its own answer with respect to a principle drawn at random and rewrites it, possibly over several rounds; the model is then fine-tuned on the revised answers. A second phase uses the same principles to produce preferences (RLAIF, Section 4). The idea has several descendants. SELF-ALIGN ([Sun et al., 2023](https://www.alphaxiv.org/abs/2305.03047)) aligned a base LLaMA-65B model with fewer than 300 lines of human annotation, including 16 principles, by generating prompts and answers that follow the principles in context. Deliberative alignment ([Guan et al., 2024](https://www.alphaxiv.org/abs/2412.16339)) puts the relevant safety specification in the system prompt, lets a reasoning model answer with a chain of thought that cites it, filters the answers with a judge that knows the specification, and removes the specification from the training examples: the model learns to recall and apply the rules without seeing them. Training on what a model produces with an instruction in its context, and without the instruction, is called *context distillation*.
 :::
 
 ## Loss masking
@@ -463,7 +491,7 @@ The value $-100$ is the default `ignore_index` of PyTorch's cross-entropy: posit
 **Cross-entropy = maximum likelihood estimation.** For one token:
 $$\mathcal{L}_{CE} = -\log p_\theta(y_t \mid y_{<t}, x) = -\log \frac{e^{\text{logit}_{y_t}}}{\sum_{v} e^{\text{logit}_v}}$$
 
-- Penalises **only the probability mass on the correct token**.
+- Depends only on the **probability of the correct token**. Its gradient on the logits is $p_v - \mathbb{1}[v = y_t]$: the correct token goes up, and every other token goes down in proportion to its probability.
 - Minimising CE over a dataset = maximising the likelihood of the training data under the model.
 - Equivalently, minimising the KL divergence from the empirical data distribution to the model's distribution.
 
@@ -503,9 +531,9 @@ You fine-tune on conversations whose answers range from 20 to 2,000 tokens, with
 To avoid padding, you then pack several conversations into each training sequence of 4,096 tokens. What can go wrong?
 
 ::: answer
-**Two natural averages.** With loss masking, the number of trained tokens varies from one example to the next, and the loss can be averaged in two ways: over all the trained tokens of the batch, so that each token has the same weight, or over the tokens of each example first and then over the examples, so that each conversation has the same weight. These are different objectives. The token average is the negative log-likelihood per token of the data, the quantity that maximum likelihood minimises, and with it an answer of 2,000 tokens weighs a hundred times as much as an answer of 20 tokens. The per-example average gives each token of the short answer a weight a hundred times larger than each token of the long one, and therefore favours what short answers teach (format, tone, brevity). Neither is wrong, but the choice should be deliberate; the token average is the usual default.
+**Two natural averages.** With loss masking, the number of trained tokens varies from one example to the next, and the loss can be averaged in two ways: over all the trained tokens of the batch, so that each token has the same weight, or over the tokens of each example first and then over the examples, so that each conversation has the same weight. These are different objectives. The token average is the negative log-likelihood per token of the data, the quantity that maximum likelihood minimises, and with it an answer of 2,000 tokens weighs a hundred times as much as an answer of 20 tokens. The per-example average gives each token of the short answer a weight a hundred times larger than each token of the long one, and therefore favours what short answers teach (format, tone, brevity). Both are acceptable, but the choice should be deliberate. The token average is the usual default.
 
-**The gradient accumulation trap.** Gradient accumulation is meant to reproduce a large batch with several small ones. If each micro-batch computes the mean loss over its own trained tokens and the accumulated gradient is the average of these means, the result is not the token average over the full batch. Suppose that one micro-batch has 10 trained tokens and another one 1,000. In the average of the two means, each token of the first has weight $1/20$ and each token of the second $1/2{,}000$, while the token average over the batch gives every token the weight $1/1{,}010$: the tokens of the small micro-batch count a hundred times more than those of the large one. The correct implementation sums the losses of all the trained tokens and divides by the total number of trained tokens of the accumulated batch, counted before the backward passes, and summed over all the workers with data parallelism. This discrepancy went unnoticed for a long time in widely used training libraries before being fixed in 2024; its symptom is a training loss that changes with the number of accumulation steps at a fixed effective batch size.
+**The gradient accumulation trap.** Gradient accumulation is meant to reproduce a large batch with several small ones. If each micro-batch computes the mean loss over its own trained tokens and the accumulated gradient is the average of these means, the result is not the token average over the full batch. Suppose that one micro-batch has 10 trained tokens and another one 1,000. In the average of the two means, each token of the first has weight $1/20$ and each token of the second $1/2{,}000$, while the token average over the batch gives every token the weight $1/1{,}010$: the tokens of the small micro-batch count a hundred times more than those of the large one. The correct implementation sums the losses of all the trained tokens and divides by the total number of trained tokens of the accumulated batch, counted before the backward passes, and summed over all the workers with data parallelism.
 
 **Padding and packing.** Padding a batch to its longest sequence wastes compute in proportion to the spread of the lengths: with examples of 500 tokens on average, padded to 4,096, about 88% of the computation is spent on padding. Packing concatenates several examples into each sequence and removes this waste, but done naively it has three problems:
 
@@ -529,10 +557,10 @@ When a **checker** is available (known answer, unit tests, reward model), the mo
 
 . . .
 
-This is **rejection sampling fine-tuning**, also called expert iteration: STaR (2022), ReST (2023), the post-training of Llama 2 and 3, the third stage of DeepSeek-R1.
+This is **rejection sampling fine-tuning**, also called expert iteration: [STaR](https://www.alphaxiv.org/abs/2203.14465) (2022), [ReST](https://www.alphaxiv.org/abs/2308.08998) (2023), the post-training of Llama 2 and 3, the third stage of DeepSeek-R1.
 
 ::: lecture
-The papers are Zelikman et al. (2022) for STaR, Yuan et al. (2023) for RFT on math problems and Gulcehre et al. (2023) for ReST. The training answers are written in the style of the model, so they are closer to its own distribution than the answers of a human or of another model, and the model only has to learn which of its answers to prefer. STaR adds a trick for the problems on which no sample is correct: the model is given the correct answer as a hint and asked to write a justification for it, which is then used as a label without the hint. This idea, the model with extra information acting as its own teacher, returns in Section 7. Section 3 shows that rejection sampling fine-tuning is a special case of reinforcement learning, with a reward in $\{0, 1\}$ and no negative signal.
+The papers are [Zelikman et al. (2022)](https://www.alphaxiv.org/abs/2203.14465) for STaR, [Yuan et al. (2023)](https://www.alphaxiv.org/abs/2308.01825) for RFT on math problems and [Gulcehre et al. (2023)](https://www.alphaxiv.org/abs/2308.08998) for ReST. The training answers are written in the style of the model, so they are closer to its own distribution than the answers of a human or of another model, and the model only has to learn which of its answers to prefer. STaR adds a trick for the problems on which no sample is correct: the model is given the correct answer as a hint and asked to write a justification for it, which is then used as a label without the hint. This idea, the model with extra information acting as its own teacher, returns in Section 7. Section 3 shows that rejection sampling fine-tuning is a special case of reinforcement learning, with a reward in $\{0, 1\}$ and no negative signal.
 :::
 
 ## Labels as distributions: knowledge distillation
@@ -542,20 +570,20 @@ A teacher gives more than one answer: at each position, it gives a **distributio
 
 $$\mathcal{L}_{\text{KD}} = \sum_t \mathrm{KL}\big(p_T(\cdot \mid y_{<t}, x) \,\|\, p_\theta(\cdot \mid y_{<t}, x)\big)$$
 
-- A soft label carries much more information than the single token of a sampled answer.
+- A distribution carries much more information than the single token of a sampled answer.
 - Requires the logits of the teacher, and the same tokenizer.
-- Used for small models: DistilBERT (2019), Gemma 2 (2024), Llama 3.2 1B and 3B (2024).
+- Used for small models: [DistilBERT](https://www.alphaxiv.org/abs/1910.01108) (2019), [Gemma 2](https://www.alphaxiv.org/abs/2408.00118) (2024), Llama 3.2 1B and 3B (2024).
 
 ::: lecture
-Knowledge distillation was introduced by Hinton et al. (2015) for classifiers: the student learns from the probabilities that the teacher gives to all the classes, including the wrong ones, which tell it which mistakes are reasonable. For a language model, the sequence $y$ is usually written by the teacher or taken from a dataset, and the loss compares the two distributions at every position, so the student gets a full distribution per token instead of one sampled token. The KL goes from the teacher to the student, as in the cross-entropy with the data: the student must cover all the tokens the teacher finds plausible. The two practical requirements, access to the logits and a shared vocabulary, explain why logit distillation is used within a model family (Gemma, Llama) and why distillation from a commercial model through its API is sequence-level only.
+Knowledge distillation was introduced by [Hinton et al. (2015)](https://www.alphaxiv.org/abs/1503.02531) for classifiers: the student learns from the probabilities that the teacher gives to all the classes, including the wrong ones, which tell it which mistakes are reasonable. For a language model, the sequence $y$ is usually written by the teacher or taken from a dataset, and the loss compares the two distributions at every position, so the student gets a full distribution per token instead of one sampled token. The KL goes from the teacher to the student, as in the cross-entropy with the data: the student must cover all the tokens the teacher finds plausible. The two practical requirements, access to the logits and a shared vocabulary, explain why logit distillation is used within a model family (Gemma, Llama) and why distillation from a commercial model through its API is sequence-level only.
 :::
 
 ## What SFT cannot do
 <!-- type: content -->
 
-- **It cannot do better than its labels.** A model trained on mediocre answers learns mediocre answers.
-- **It has no negative signal.** It learns "this answer is right", never "this answer is wrong".
-- **It trains on prefixes written by others.** At inference, the model reads its own previous tokens, and its errors add up.
+- It cannot do better than its labels.
+- It has no negative signal.
+- It trains on prefixes written by others.
 
 . . .
 
@@ -744,11 +772,11 @@ for q in ["What is the capital of France?", "What is 7 × 8?", "What is a neural
 # 3. Reinforcement Learning for LLMs
 <!-- type: content -->
 
-With labels, we tell the model **what to write**. With a reward, we only tell it **how good** its answer was.
+With labels, we tell the model **what to write**. With a reward, we tell it **how good** its answer was.
 
 | | Labels (Section 2) | Rewards (Sections 3 to 7) |
 |---|---|---|
-| who writes the training answers | a human, a teacher | the model being trained |
+| who writes the training answers | a human or a teacher model | the model being trained |
 | signal | target tokens | a score on the answer |
 | negative feedback | no | yes |
 
@@ -764,12 +792,34 @@ A reward is weaker information than a label: a single number on a whole answer, 
 | **Policy** $\pi_\theta$ | the language model being trained |
 | **State** | the prompt and the tokens generated so far |
 | **Action** | the next token |
-| **Reward** | $r(x, y)$, usually given once, at the end of the answer |
-
-The model generates a full answer $y$ (a sequence of actions), then receives a single reward.
+| **Reward** | $r(x, y)$, for the prompt $x$ and the answer $y$, complete or partial |
 
 ::: lecture
-This is an unusual reinforcement learning problem: the transitions are deterministic (the next state is the current state with the chosen token appended), the episodes are short, and the action space is the whole vocabulary, tens of thousands of actions. The difficulty is credit assignment: a single number at the end of the answer must be distributed over all the tokens that produced it. Section 7 shows how a teacher can give a reward at every token instead.
+This is an unusual reinforcement learning problem: the transitions are deterministic (the next state is the current state with the chosen token appended), the episodes are short, and the action space is the whole vocabulary, tens of thousands of actions. The difficulty is credit assignment: when the reward comes at the end of the answer (next slide), a single number must be distributed over all the tokens that produced it. Section 7 shows how a teacher can give a reward at every token instead.
+:::
+
+## Outcome and process rewards
+<!-- type: content -->
+
+An answer $y = (y_1, \ldots, y_T)$ is cut into steps, such as the lines of a reasoning, and ends with a final answer.
+
+| | Outcome reward (ORM) | Process reward (PRM) |
+|---|---|---|
+| Scores | the whole answer: $r(x, y)$ | each step ending at token $t$: $r(x, y_{\leq t})$ |
+| Labels | is the final answer correct? | is this step correct? (humans, or rollouts) |
+| A wrong step in a correct answer | is rewarded | is penalised |
+
+. . .
+
+- [Lightman et al. (2023)](https://www.alphaxiv.org/abs/2305.20050): 800,000 human labels of steps on MATH. Choosing the best of 1,860 answers solves 78.2% of the problems with a PRM, 72.4% with an ORM, 69.6% with majority voting.
+- DeepSeek R1 gave up on PRMs: steps are hard to delimit and to label, and a learned PRM gets hacked.
+
+::: lecture
+The two terms come from [Uesato et al. (2022)](https://www.alphaxiv.org/abs/2211.14275). An ORM is a classifier trained to predict whether a solution is correct, with labels obtained by checking the final answer; a program that checks the answer, as in Section 5, is an outcome reward that needs no model at all. An outcome reward has two weaknesses: a solution that reaches the correct answer with wrong reasoning is counted as correct, and a wrong solution gives no indication of where the mistake is. A PRM predicts the correctness of each step. Lightman et al. train it as a language model that outputs a label token after each step, and score a whole solution by the product of the step probabilities, that is the probability that every step is correct. Their annotators labelled the steps of solutions written by GPT-4 as positive, negative or neutral, up to the first mistake; the dataset, PRM800K, has 800,000 labels on 75,000 solutions to 12,000 problems, and the evaluation uses 500 problems of the MATH test set.
+
+Human labels are expensive. Math-Shepherd ([Wang et al., 2024](https://www.alphaxiv.org/abs/2312.08935)) replaces them by rollouts: from each step, the model completes the solution $N$ times, and the step is labelled by the fraction of completions that reach the correct answer, or by whether at least one does. This is a Monte Carlo estimate of the value of the step, as in Monte Carlo tree search, and the reasoning behind it is the same as for the value model of PPO later in this section.
+
+A PRM is used in three ways: to rerank sampled solutions (best-of-N), to guide a search step by step, and as a dense reward in RL, where each step gets its own reward instead of sharing the reward of the whole answer. Math-Shepherd trains Mistral-7B with PPO and a reward at the end of each step, from 28.6% to 33.0% on MATH. The DeepSeek R1 report (Section 5) lists the PRM among its unsuccessful attempts, for three reasons: a step is hard to define in free-form reasoning, judging whether an intermediate step is correct is hard to automate and too expensive to do by hand, and a learned PRM can be hacked by the policy, while retraining it costs more resources. Most reasoning models since then use outcome rewards from verifiers. Dense rewards come back in other forms: the process reward of Clay et al. (slide "Does RL create new abilities?") and the teacher of on-policy distillation (Section 7), which gives a reward at every token.
 :::
 
 ## The objective
@@ -782,75 +832,10 @@ $$J(\theta) = \mathbb{E}_{x,\ y \sim \pi_\theta(\cdot \mid x)}\big[r(x, y)\big] 
 . . .
 
 - Without the KL term, the policy finds answers that score high but are nonsense: **reward hacking**.
-- $\beta$ sets the trade-off: large $\beta$ stays close to the reference, small $\beta$ chases the reward.
+- $\beta$ sets the trade-off: large $\beta$ stays close to the reference, small $\beta$ focuses on the reward.
 
 ::: lecture
 The reference model is never updated. Rewards are imperfect: a learned reward model is only reliable on answers that resemble those it was trained on, and even a program that checks answers has blind spots. The KL term keeps the policy in the region where the reward can be trusted, and preserves the fluency and the diversity of the reference, which the reward does not measure. All the methods of the next sections optimise this objective, or a close variant; they differ in the reward $r$ and in the way the gradient is estimated.
-:::
-
-## The policy gradient
-<!-- type: content -->
-
-Sampling is not differentiable, but the gradient of the expected reward is an expectation (REINFORCE, Williams, 1992):
-
-$$\nabla_\theta\, \mathbb{E}_{y \sim \pi_\theta}[r(x, y)] = \mathbb{E}_{y \sim \pi_\theta}\Big[\big(r(x, y) - b(x)\big)\, \nabla_\theta \log \pi_\theta(y \mid x)\Big]$$
-
-. . .
-
-- A weighted SFT loss on the model's own samples, with weight $A = r - b$, the **advantage**.
-- The baseline $b(x)$ does not bias the gradient, and reduces its variance.
-
-::: lecture
-For a language model, $\log \pi_\theta(y \mid x) = \sum_t \log \pi_\theta(y_t \mid x, y_{<t})$: the gradient of one sample is the advantage times the gradient of the log-likelihood of the answer. Answers better than the baseline become more likely, answers worse than the baseline less likely. The interview question at the end of this section derives the formula and explains why the baseline is free.
-:::
-
-## Where does the baseline come from?
-<!-- type: content -->
-
-| Method | Baseline $b$ | Extra cost |
-|---|---|---|
-| REINFORCE | none, or a running average | none |
-| PPO | a learned **value model** $V(x, y_{<t})$ | a second network, as large as the policy |
-| GRPO (Section 5) | mean reward of a **group** of answers to the same prompt | several samples per prompt |
-| RLOO | mean reward of the *other* answers of the group | several samples per prompt |
-
-::: lecture
-PPO (Schulman et al., 2017) was the algorithm of RLHF. Its value model predicts, from each prefix, the reward expected at the end of the answer, so the advantage of a token is how much the outcome exceeded this prediction; the estimate is refined by generalized advantage estimation (Schulman et al., 2016). The value model has to be trained alongside the policy and takes as much memory. GRPO (Shao et al., 2024) and RLOO (Ahmadian et al., 2024) replace it by a Monte Carlo estimate: sample several answers to the same prompt and compare each one to the others.
-:::
-
-## The PPO update
-<!-- type: content -->
-
-PPO maximizes a **clipped** surrogate objective over tokens $t$, with the probability ratio $\rho_t = \pi_\theta(y_t \mid s_t) / \pi_{\text{old}}(y_t \mid s_t)$:
-$$\mathcal{L}^{\text{PPO}} = \mathbb{E}_t\Bigl[\min\bigl(\rho_t A_t,\ \mathrm{clip}(\rho_t, 1 - \epsilon, 1 + \epsilon)\, A_t\bigr)\Bigr]$$
-
-. . .
-
-- $\pi_{\text{old}}$ sampled the answers; each batch is reused for several gradient steps.
-- The clipping ($\epsilon \approx 0.2$) prevents one batch from moving the policy too far.
-
-::: lecture
-Generation is the expensive part of RL for language models, so PPO reuses each batch of samples for several gradient steps; the ratio $\rho_t$ corrects for the fact that the policy has changed since sampling. With a positive advantage, the objective increases the probability of the token, but the clipping removes any gain beyond $\rho_t = 1 + \epsilon$; with a negative advantage, symmetrically, below $1 - \epsilon$. When each batch is used for a single step, $\pi_{\text{old}} = \pi_\theta$, the ratio equals 1, and PPO reduces to the policy gradient of the previous slide.
-:::
-
-## KL divergence
-<!-- type: content -->
-
-For two probability distributions $P$ and $Q$ over the same space:
-$$\text{KL}(P \| Q) = \mathbb{E}_{x \sim P}\!\left[\log \frac{P(x)}{Q(x)}\right] = \sum_x P(x) \log \frac{P(x)}{Q(x)}$$
-
-- Non-negative: $\text{KL}(P \| Q) \geq 0$, with equality if and only if $P = Q$.
-- Asymmetric: $\text{KL}(P \| Q) \neq \text{KL}(Q \| P)$ in general.
-
-. . .
-
-| Direction | Where | Behaviour |
-|---|---|---|
-| $\mathrm{KL}(p_{\text{data}} \,\|\, \pi_\theta)$ | SFT, distillation | the model must **cover** all the answers of the data |
-| $\mathrm{KL}(\pi_\theta \,\|\, \pi_{\text{ref}})$ | RL objective | the policy may **concentrate** on a few plausible answers |
-
-::: lecture
-In SFT, the cross-entropy minimises the KL from the data to the model, since $H(p_{\text{data}}, p_\theta) = H(p_{\text{data}}) + \mathrm{KL}(p_{\text{data}} \,\|\, p_\theta)$ and the entropy of the data does not depend on $\theta$. This KL heavily penalises a model that gives a low probability to an answer of the data: it is *mode-covering*. In RL, the KL goes from the policy to the reference, and the expectation is taken over the answers of the policy: the policy may drop most of the answers of the reference and keep a few, but it is penalised for producing answers that the reference finds very unlikely. This direction is *mode-seeking*. The difference explains why RL lowers the entropy of the model (Section 5), and it returns in Section 7, where a student can be distilled in either direction.
 :::
 
 ## The KL penalty in practice
@@ -869,7 +854,98 @@ $$
 A sum of **per-token differences of log-probabilities**, computed with one forward pass of each model.
 
 ::: lecture
-Since $y$ is sampled from $\pi_\theta$, the expectation of this log-ratio is exactly the KL divergence: it is an unbiased estimator. On a single sample it can be negative, which makes it noisy. GRPO and the lab below use another unbiased estimator, which is always non-negative (Schulman, 2020): with $u = \pi_\text{ref}(y_t \mid y_{<t}, x) / \pi_\theta(y_t \mid y_{<t}, x)$, the per-token term $u - \log u - 1$. In InstructGPT, the KL penalty is computed token by token and added to the reward, so that the RL algorithm sees it as part of the environment; GRPO keeps it as a separate term of the loss.
+Since $y$ is sampled from $\pi_\theta$, the expectation of this log-ratio is exactly the KL divergence: it is an unbiased estimator. On a single sample it can be negative, which makes it noisy. GRPO and the lab below use another unbiased estimator, which is always non-negative ([Schulman, 2020](http://joschu.net/blog/kl-approx.html)): with $u = \pi_\text{ref}(y_t \mid y_{<t}, x) / \pi_\theta(y_t \mid y_{<t}, x)$, the per-token term $u - \log u - 1$. In InstructGPT, the KL penalty is computed token by token and added to the reward, so that the RL algorithm sees it as part of the environment; GRPO keeps it as a separate term of the loss.
+:::
+
+## The policy gradient
+<!-- type: content -->
+
+Sampling is not differentiable, but the gradient of the expected reward is an expectation (REINFORCE, [Williams, 1992](https://people.cs.umass.edu/~barto/courses/cs687/williams92simple.pdf)). With $\nabla_\theta \pi_\theta = \pi_\theta\, \nabla_\theta \log \pi_\theta$:
+
+$$\begin{aligned}
+\nabla_\theta\, \mathbb{E}_{y \sim \pi_\theta}[r(x, y)] &= \sum_y r(x, y)\, \nabla_\theta \pi_\theta(y \mid x) \\
+&= \mathbb{E}_{y \sim \pi_\theta}\big[r(x, y)\, \nabla_\theta \log \pi_\theta(y \mid x)\big]
+\end{aligned}$$
+
+. . .
+
+- For a language model, $\log \pi_\theta(y \mid x) = \sum_t \log \pi_\theta(y_t \mid x, y_{<t})$: the gradient of the SFT loss on $y$.
+- So the policy gradient is a **weighted SFT** on the model's own samples, with weight $r(x, y)$.
+
+::: lecture
+The identity $\nabla_\theta \pi_\theta = \pi_\theta\, \nabla_\theta \log \pi_\theta$ is called the log-derivative trick: it turns a sum weighted by the gradient of a probability into an expectation under that probability, which we can estimate by sampling. Each sampled answer contributes the gradient of its log-likelihood, exactly as in SFT, scaled by its reward: answers with a high reward become more likely. The reward itself is never differentiated, so it can be any function of the answer, a reward model, a unit test or a human rating.
+:::
+
+## Reducing the variance: the baseline
+<!-- type: content -->
+
+- The expectation is over all possible answers: we estimate it with a few samples.
+- This estimate has a **high variance**. If all rewards are positive, every sampled answer is made more likely, and only the amounts differ.
+
+. . .
+
+Subtract a **baseline** $b(x)$ that does not depend on $y$:
+
+$$\nabla_\theta\, \mathbb{E}_{y \sim \pi_\theta}[r(x, y)] = \mathbb{E}_{y \sim \pi_\theta}\Big[\big(r(x, y) - b(x)\big)\, \nabla_\theta \log \pi_\theta(y \mid x)\Big]$$
+
+- No bias: $\mathbb{E}_{y \sim \pi_\theta}\big[b(x)\, \nabla_\theta \log \pi_\theta(y \mid x)\big] = b(x)\, \nabla_\theta \sum_y \pi_\theta(y \mid x) = 0$.
+- The weight $A = r - b$ is the **advantage**: answers better than the baseline become more likely, worse ones less likely.
+
+::: lecture
+With a few samples per prompt, the direction of the estimated gradient depends a lot on which answers happened to be drawn. A good baseline is close to the expected reward of the prompt: the advantage is then positive for the answers that are better than usual and negative for the others, so the update pushes in the right direction even with few samples.
+:::
+
+## Where does the baseline come from?
+<!-- type: content -->
+
+| Method | Baseline $b$ | Extra cost |
+|---|---|---|
+| REINFORCE | none, or a running average | none |
+| PPO | a learned **value model** $V(x, y_{<t})$ | a second network, as large as the policy |
+| GRPO (Section 5) | mean reward of a **group** of answers to the same prompt | several samples per prompt |
+| RLOO | mean reward of the *other* answers of the group | several samples per prompt |
+
+PPO uses one baseline per token: $V(x, y_{<t})$ sees the prompt and the prefix, but not the token $y_t$ it weighs, so the gradient stays unbiased.
+
+::: lecture
+The baseline $b(x)$ of the previous slide is one number per answer. Since $\log \pi_\theta(y \mid x)$ is a sum over tokens, each token can get its own baseline, as long as it does not depend on that token or on the following ones: the baseline of $y_t$ may use the prompt and the prefix $y_{<t}$, which is what the value model does. PPO ([Schulman et al., 2017](https://www.alphaxiv.org/abs/1707.06347)) was the algorithm of RLHF. Its value model predicts, from each prefix, the reward expected at the end of the answer, so the advantage of a token is how much the outcome exceeded this prediction; the estimate is refined by generalized advantage estimation ([Schulman et al., 2016](https://www.alphaxiv.org/abs/1506.02438)). The value model has to be trained alongside the policy and takes as much memory. GRPO ([Shao et al., 2024](https://www.alphaxiv.org/abs/2402.03300)) and RLOO ([Ahmadian et al., 2024](https://www.alphaxiv.org/abs/2402.14740)) replace it by a Monte Carlo estimate: sample several answers to the same prompt and compare each one to the others.
+:::
+
+## Reusing samples: importance sampling
+<!-- type: content -->
+
+Generation is the expensive part: PPO reuses each batch, sampled by $\pi_{\text{old}}$, for several gradient steps. After the first step, the samples no longer come from $\pi_\theta$.
+
+. . .
+
+**Importance sampling** reweights samples of one distribution to estimate an expectation under another:
+$$\mathbb{E}_{y \sim \pi_\theta}[f(y)] = \mathbb{E}_{y \sim \pi_{\text{old}}}\Big[\frac{\pi_\theta(y)}{\pi_{\text{old}}(y)}\, f(y)\Big]$$
+
+. . .
+
+Per token, with the state $s_t = (x, y_{<t})$ and the ratio $\rho_t = \pi_\theta(y_t \mid s_t) / \pi_{\text{old}}(y_t \mid s_t)$:
+$$\mathcal{L}(\theta) = \mathbb{E}_t\big[\rho_t A_t\big]$$
+
+- At $\theta = \theta_{\text{old}}$, $\rho_t = 1$ and $\nabla_\theta \rho_t = \nabla_\theta \log \pi_\theta(y_t \mid s_t)$: the gradient is the policy gradient.
+
+::: lecture
+The ratio $\rho_t$ corrects for the fact that the policy has changed since sampling. The exact correction for a whole answer would be the product of the ratios of all its tokens, whose variance explodes with the length of the answer; PPO uses the ratio of each token on its own, treating each token as an action taken in the state $s_t$. This is an approximation, which is good as long as $\pi_\theta$ stays close to $\pi_{\text{old}}$. The next slide enforces this.
+:::
+
+## The PPO update: clipping
+<!-- type: content -->
+
+After several steps on the same batch, $\rho_t$ can move far from 1: the reweighted estimate becomes unreliable. PPO maximizes a **clipped** objective:
+$$\mathcal{L}^{\text{PPO}} = \mathbb{E}_t\Bigl[\min\bigl(\rho_t A_t,\ \mathrm{clip}(\rho_t, 1 - \epsilon, 1 + \epsilon)\, A_t\bigr)\Bigr]$$
+
+. . .
+
+- $A_t > 0$: the probability of the token increases, with no gain beyond $\rho_t = 1 + \epsilon$.
+- $A_t < 0$: it decreases, with no gain below $\rho_t = 1 - \epsilon$.
+- The clipping ($\epsilon \approx 0.2$) prevents one batch from moving the policy too far.
+
+::: lecture
+Once the ratio is outside the interval $[1 - \epsilon, 1 + \epsilon]$ in the direction favoured by the advantage, the clipped term is constant and its gradient is zero: the token stops contributing to the update. The minimum keeps the unclipped term when it is smaller, so a change in the wrong direction is always penalised. When each batch is used for a single step, $\pi_{\text{old}} = \pi_\theta$, the ratio equals 1, the clipping never acts, and PPO reduces to the policy gradient with a baseline.
 :::
 
 ## Online and offline, on-policy and off-policy
@@ -908,38 +984,10 @@ On-policy data is what the model actually produces, so its mistakes are seen and
 The table goes from rewards that are cheap to query but expensive to build (a reward model needs thousands of human comparisons) to rewards that need no human at all. It also goes from sparse rewards, one number per answer, to dense ones, one number per token. The algorithms change less than the rewards: PPO, GRPO and their variants can be used with any row of the table, and most of the progress since 2024 has come from finding new sources of reward.
 :::
 
-## Interview: the policy gradient {.interview}
-<!-- type: interview -->
-
-In RLHF, the reward $r(x, y)$ is computed on a sampled response, and sampling is not differentiable. How do you compute the gradient of $J(\theta) = \mathbb{E}_{y \sim \pi_\theta(\cdot \mid x)}[r(x, y)]$?
-
-Why subtract a baseline from the reward, and why does this not bias the gradient?
-
-::: answer
-**The log-derivative trick.** The reward does not depend on $\theta$; only the distribution of $y$ does. Writing the expectation as a sum over responses and using $\nabla \pi = \pi\, \nabla \log \pi$,
-$$\nabla_\theta J = \sum_y r(x, y)\, \nabla_\theta \pi_\theta(y \mid x) = \mathbb{E}_{y \sim \pi_\theta}\big[r(x, y)\, \nabla_\theta \log \pi_\theta(y \mid x)\big].$$
-The right-hand side is an expectation under the policy, which we estimate by sampling: this is the REINFORCE estimator (Williams, 1992). For a language model, $\log \pi_\theta(y \mid x) = \sum_t \log \pi_\theta(y_t \mid x, y_{<t})$, so the gradient of one sample is the reward times the gradient of the log-likelihood of the response. In code, it is a weighted SFT loss on the model's own samples, in which the reward is a constant:
-```python
-# logprobs: log-probabilities of the tokens of the sampled response
-loss = -(reward - baseline).detach() * logprobs.sum()
-```
-With rewards in $\{0, 1\}$ and no baseline, the gradient of a batch is that of SFT on its correct samples: the method known as rejection sampling fine-tuning, or expert iteration, is a special case.
-
-**The baseline is free.** For any $b(x)$ that does not depend on the sampled response,
-$$\mathbb{E}_{y \sim \pi_\theta}\big[b(x)\, \nabla_\theta \log \pi_\theta(y \mid x)\big] = b(x) \sum_y \nabla_\theta \pi_\theta(y \mid x) = b(x)\, \nabla_\theta \sum_y \pi_\theta(y \mid x) = b(x)\, \nabla_\theta 1 = 0,$$
-so subtracting $b(x)$ from the reward leaves the expected gradient unchanged. It changes the variance a lot, however. If all rewards lie between 9 and 11, every sampled response is pushed up, and the useful information, which responses are better than the others, is a small difference between large noisy terms; with $b(x) \approx \mathbb{E}[r]$, the responses better than average are pushed up and the others down. The constant that minimises the variance is not exactly the mean reward (it weights the rewards by $\|\nabla \log \pi\|^2$), but the mean is the standard choice. The same argument works token by token: a baseline that depends on the prefix $y_{<t}$ but not on $y_t$ does not bias the term of token $t$.
-
-**The baselines of this lecture.** PPO learns its baseline: the value model predicts the expected reward from each prefix, and the advantage is the reward minus this prediction, refined by generalized advantage estimation (Schulman et al., 2016). GRPO (Section 5) uses the mean reward of a group of answers to the same prompt. RLOO (Ahmadian et al., 2024) uses, for answer $i$, the mean $\bar r_{-i}$ of the *other* $G - 1$ answers, which is independent of answer $i$ and therefore exactly unbiased. The group mean of GRPO includes answer $i$ itself, but this only rescales the advantage, since $r_i - \bar r = \frac{G-1}{G}\,(r_i - \bar r_{-i})$; the division by the standard deviation of the group, which depends on $r_i$, is what introduces a bias.
-
-**From REINFORCE to PPO.** The estimator needs samples from the current policy. Generation is expensive, so PPO reuses each batch of samples for several gradient steps and corrects with the importance weights $\rho_t = \pi_\theta / \pi_{\text{old}}$. These weights have a high variance as soon as the policy moves away from the one that sampled, and the clipping of PPO limits how far one batch can move it.
-
-**Pitfalls.** Forgetting to detach the reward or the advantage, which lets the policy loss differentiate through the value model; changing the normalisation over tokens without noticing that it changes the objective (the question on averaging the SFT loss, Section 2); and reading the value of the policy-gradient "loss" as a measure of progress. This loss is only a device to obtain the right gradient, its value says nothing about the quality of the policy, and the quantities to monitor are the reward and the KL to the reference.
-:::
-
 # 4. Rewards Learned from Preferences
 <!-- type: content -->
 
-RLHF, the recipe of InstructGPT (Ouyang et al., 2022) and ChatGPT, in three steps:
+RLHF, the recipe of InstructGPT ([Ouyang et al., 2022](https://www.alphaxiv.org/abs/2203.02155)) and ChatGPT, in three steps:
 
 1. **SFT** on human demonstrations;
 2. train a **reward model** on human comparisons;
@@ -950,7 +998,7 @@ RLHF, the recipe of InstructGPT (Ouyang et al., 2022) and ChatGPT, in three step
 Labelers preferred the answers of the 1.3B InstructGPT to those of the 175B GPT-3.
 
 ::: lecture
-The idea of learning a reward from human comparisons predates language models: Christiano et al. (2017) used it to train agents on Atari games and simulated robotics, and Stiennon et al. (2020) applied it to summarization. InstructGPT made it the standard recipe for assistants. Its result on model size was a surprise at the time: in the eyes of the labelers, alignment made a model a hundred times smaller more useful than the original GPT-3.
+The idea of learning a reward from human comparisons predates language models: [Christiano et al. (2017)](https://www.alphaxiv.org/abs/1706.03741) used it to train agents on Atari games and simulated robotics, and [Stiennon et al. (2020)](https://www.alphaxiv.org/abs/2009.01325) applied it to summarization. InstructGPT made it the standard recipe for assistants. Its result on model size was a surprise at the time: in the eyes of the labelers, alignment made a model a hundred times smaller more useful than the original GPT-3.
 :::
 
 ## Why not just more SFT?
@@ -1073,7 +1121,7 @@ The policy maximises the **score of the reward model**, not the actual quality. 
 > The reward model approximates human preferences. Optimising it too hard breaks the approximation.
 
 ::: lecture
-This is an instance of Goodhart's law: when a measure becomes a target, it ceases to be a good measure. Gao et al. (2023) measured it with a large "gold" reward model playing the role of the humans: as the policy optimises a smaller proxy reward model, the gold reward first increases, then decreases, while the proxy reward keeps increasing. Larger reward models and more preference data push the turning point further.
+This is an instance of Goodhart's law: when a measure becomes a target, it ceases to be a good measure. [Gao et al. (2023)](https://www.alphaxiv.org/abs/2210.10760) measured it with a large "gold" reward model playing the role of the humans: as the policy optimises a smaller proxy reward model, the gold reward first increases, then decreases, while the proxy reward keeps increasing. Larger reward models and more preference data push the turning point further.
 :::
 
 ## Interview: the reward goes up, the users are unhappy {.interview}
@@ -1084,9 +1132,9 @@ During RLHF with PPO, the score of the reward model keeps increasing. Human rate
 What is happening, and what would you do?
 
 ::: answer
-**Diagnosis: overoptimisation of the reward model.** The reward model is a proxy of human preferences, trained on a finite set of comparisons between responses of the SFT model. RL searches for the responses that maximise the proxy, and the further the policy moves from the SFT model, the more it finds responses on which the proxy and the true preferences disagree. Gao et al. (2023) measured this with a large "gold" reward model playing the role of the humans: as a function of the distance to the initial policy (measured by the square root of the KL), the gold reward first rises and then falls, while the proxy reward keeps rising. The run of the question has passed the peak.
+**Diagnosis: overoptimisation of the reward model.** The reward model is a proxy of human preferences, trained on a finite set of comparisons between responses of the SFT model. RL searches for the responses that maximise the proxy, and the further the policy moves from the SFT model, the more it finds responses on which the proxy and the true preferences disagree. [Gao et al. (2023)](https://www.alphaxiv.org/abs/2210.10760) measured this with a large "gold" reward model playing the role of the humans: as a function of the distance to the initial policy (measured by the square root of the KL), the gold reward first rises and then falls, while the proxy reward keeps rising. The run of the question has passed the peak.
 
-**Why the length.** Length is the easiest feature to exploit, because it is correlated with quality in the preference data: longer answers are often more complete, and both annotators and reward models learn to prefer them. Singhal et al. (2023) found that a large part of the reward gains of RLHF on standard datasets came from longer answers. Other features that get exploited are formatting (lists, headings, bold text), a confident tone, and agreement with the opinion stated by the user, or sycophancy, which Sharma et al. (2023) traced back to the preferences of the human raters themselves.
+**Why the length.** Length is the easiest feature to exploit, because it is correlated with quality in the preference data: longer answers are often more complete, and both annotators and reward models learn to prefer them. [Singhal et al. (2023)](https://www.alphaxiv.org/abs/2310.03716) found that a large part of the reward gains of RLHF on standard datasets came from longer answers. Other features that get exploited are formatting (lists, headings, bold text), a confident tone, and agreement with the opinion stated by the user, or sycophancy, which [Sharma et al. (2023)](https://www.alphaxiv.org/abs/2310.13548) traced back to the preferences of the human raters themselves.
 
 **Checks.**
 
@@ -1097,17 +1145,17 @@ What is happening, and what would you do?
 **Remedies.**
 
 - **Early stopping**: keep the checkpoint before the peak, selected on the held-out evaluation. A larger KL coefficient $\beta$ slows the drift and moves the peak, but does not remove it.
-- **Fix the reward**: add pairs of answers of similar lengths to the preference data, penalise length explicitly, or train the reward model to separate quality from length. Ensembles of reward models are harder to exploit than a single one (Coste et al., 2024).
-- **Refresh the reward model**: collect new comparisons on the responses of the current policy and retrain the reward model, so that it is accurate where the policy now is. Llama 2 was trained in this way, in several rounds of data collection and RLHF (Touvron et al., 2023).
+- **Fix the reward**: add pairs of answers of similar lengths to the preference data, penalise length explicitly, or train the reward model to separate quality from length. Ensembles of reward models are harder to exploit than a single one ([Coste et al., 2024](https://www.alphaxiv.org/abs/2310.02743)).
+- **Refresh the reward model**: collect new comparisons on the responses of the current policy and retrain the reward model, so that it is accurate where the policy now is. Llama 2 was trained in this way, in several rounds of data collection and RLHF ([Touvron et al., 2023](https://www.alphaxiv.org/abs/2307.09288)).
 - **Use verifiable rewards** where possible (Section 5), keeping in mind that a verifier can also be hacked, for instance by code that special-cases the unit tests.
 
-**Best-of-$N$ as a baseline.** Sampling $N$ answers and returning the best one according to the reward model defines a policy whose KL to the original one is at most $\log N - \frac{N-1}{N}$ nats, about 1.8 nats for $N = 16$; this formula was long used as exact, and Beirami et al. (2024) showed that it is an upper bound. Best-of-$N$ needs no training, and Gao et al. (2023) observed the same rise and fall of the gold reward with it. Comparing an RL run with best-of-$N$ at the same KL is a cheap way to check that RL buys something, and reward hacking with best-of-$N$ at a small $N$ is a sign that the reward model itself is weak, which no RL algorithm will fix.
+**Best-of-$N$ as a baseline.** Sampling $N$ answers and returning the best one according to the reward model defines a policy whose KL to the original one is at most $\log N - \frac{N-1}{N}$ nats, about 1.8 nats for $N = 16$; this formula was long used as exact, and [Beirami et al. (2024)](https://www.alphaxiv.org/abs/2401.01879) showed that it is an upper bound. Best-of-$N$ needs no training, and [Gao et al. (2023)](https://www.alphaxiv.org/abs/2210.10760) observed the same rise and fall of the gold reward with it. Comparing an RL run with best-of-$N$ at the same KL is a cheap way to check that RL buys something, and reward hacking with best-of-$N$ at a small $N$ is a sign that the reward model itself is weak, which no RL algorithm will fix.
 :::
 
 ## RLAIF: AI feedback instead of human feedback
 <!-- type: content -->
 
-**Constitutional AI** (Bai et al., 2022): the comparisons are made by a model rather than by humans.
+**Constitutional AI** ([Bai et al., 2022](https://www.alphaxiv.org/abs/2212.08073)): the comparisons are made by a model rather than by humans.
 
 1. Write a **constitution**: a list of principles (*"Do not assist with harmful activities"*).
 2. A model critiques and revises answers according to the principles.
@@ -1119,7 +1167,7 @@ What is happening, and what would you do?
 AI labels are cheap and consistent, and scale to millions of comparisons.
 
 ::: lecture
-The method has two phases. In the supervised phase, the model critiques and revises its own answers according to the principles, and is fine-tuned on the revisions. In the RL phase, a model compares pairs of answers according to the principles, and these AI preferences train the reward model. Human feedback does not disappear: it moves from labelling individual examples to writing and testing the principles. A variant, RLCD (Yang et al., 2024), does not even ask a model to compare: it samples one answer with a prompt that encourages the principle and one with a prompt that discourages it, and labels the first one as preferred.
+The method has two phases. In the supervised phase, the model critiques and revises its own answers according to the principles, and is fine-tuned on the revisions. In the RL phase, a model compares pairs of answers according to the principles, and these AI preferences train the reward model. Human feedback does not disappear: it moves from labelling individual examples to writing and testing the principles. A variant, RLCD ([Yang et al., 2024](https://www.alphaxiv.org/abs/2307.12950)), does not even ask a model to compare: it samples one answer with a prompt that encourages the principle and one with a prompt that discourages it, and labels the first one as preferred.
 :::
 
 ::: {.lecture .notebook}
@@ -1276,7 +1324,7 @@ A linear head on frozen features, trained on 19 pairs, ranks 65% of the held-out
 The optimal policy of the RL objective has a closed form. With it, we can train on the preference pairs **without a reward model and without sampling**.
 
 ::: lecture
-DPO was introduced by Rafailov et al. (2023), under the title *Your Language Model is Secretly a Reward Model*. It optimises the same objective as RLHF, the reward minus a KL penalty to the reference, but on a fixed dataset of preferences and with a simple classification loss: no sampling during training, no reward model, no value model. In the terms of Section 3, it is an offline method: it belongs to the family of Section 2, with a loss derived from the RL objective.
+DPO was introduced by [Rafailov et al. (2023)](https://www.alphaxiv.org/abs/2305.18290), under the title *Your Language Model is Secretly a Reward Model*. It optimises the same objective as RLHF, the reward minus a KL penalty to the reference, but on a fixed dataset of preferences and with a simple classification loss: no sampling during training, no reward model, no value model. In the terms of Section 3, it is an offline method: it belongs to the family of Section 2, with a loss derived from the RL objective.
 :::
 
 ## The DPO insight
@@ -1351,13 +1399,13 @@ The identity of the lecture notes above, objective $= -\beta\,\mathrm{KL}(\pi \,
 
 **Step 3: plug into Bradley-Terry.** The preference model only uses differences of rewards for the same prompt, so $Z(x)$ cancels:
 $$P(y_w \succ y_l \mid x) = \sigma\Big(\beta \log \frac{\pi^*(y_w \mid x)}{\pi_{\text{ref}}(y_w \mid x)} - \beta \log \frac{\pi^*(y_l \mid x)}{\pi_{\text{ref}}(y_l \mid x)}\Big).$$
-Replacing $\pi^*$ by the parametric policy $\pi_\theta$ and maximising the likelihood of the preference data gives the DPO loss. Instead of fitting a reward and then computing its optimal policy, we fit the policy directly, through the reward it implicitly defines, $\hat r_\theta(x, y) = \beta \log \frac{\pi_\theta(y \mid x)}{\pi_{\text{ref}}(y \mid x)}$. Rafailov et al. (2023) also show that two rewards that differ by a function of the prompt alone induce the same preferences and the same optimal policy, so this parametrisation loses no generality.
+Replacing $\pi^*$ by the parametric policy $\pi_\theta$ and maximising the likelihood of the preference data gives the DPO loss. Instead of fitting a reward and then computing its optimal policy, we fit the policy directly, through the reward it implicitly defines, $\hat r_\theta(x, y) = \beta \log \frac{\pi_\theta(y \mid x)}{\pi_{\text{ref}}(y \mid x)}$. [Rafailov et al. (2023)](https://www.alphaxiv.org/abs/2305.18290) also show that two rewards that differ by a function of the prompt alone induce the same preferences and the same optimal policy, so this parametrisation loses no generality.
 
 **Step 4: the gradient.** With $h = \hat r_\theta(x, y_w) - \hat r_\theta(x, y_l)$ and $\frac{d}{dh}\big({-\log \sigma(h)}\big) = -\sigma(-h)$,
 $$\nabla_\theta \mathcal{L}_{\text{DPO}} = -\beta\, \sigma\big(\hat r_\theta(x, y_l) - \hat r_\theta(x, y_w)\big)\Big[\nabla_\theta \log \pi_\theta(y_w \mid x) - \nabla_\theta \log \pi_\theta(y_l \mid x)\Big].$$
 A gradient step increases the log-likelihood of the chosen answer and decreases that of the rejected one, with a weight close to 1 when the implicit reward ranks the pair wrongly and close to 0 when it already ranks it correctly by a large margin. This weight is what distinguishes DPO from a naive loss that would push the two log-likelihoods apart forever, which the DPO paper reports to make the model degenerate.
 
-**What the gradient hides.** The two terms have the same weight, but nothing constrains the absolute values, since the loss only sees their difference. When $y_w$ and $y_l$ share most of their tokens, the gradients of the shared tokens cancel, and the update concentrates on the tokens where the answers differ. Since lowering the probability of $y_l$ is often easier than raising that of $y_w$, both log-likelihoods frequently decrease during training, the probability mass going to responses that appear in neither; DPO-Positive (Pal et al., 2024) adds a penalty when the likelihood of the chosen answer falls below its value under the reference.
+**What the gradient hides.** The two terms have the same weight, but nothing constrains the absolute values, since the loss only sees their difference. When $y_w$ and $y_l$ share most of their tokens, the gradients of the shared tokens cancel, and the update concentrates on the tokens where the answers differ. Since lowering the probability of $y_l$ is often easier than raising that of $y_w$, both log-likelihoods frequently decrease during training, the probability mass going to responses that appear in neither; DPO-Positive ([Pal et al., 2024](https://www.alphaxiv.org/abs/2402.13228)) adds a penalty when the likelihood of the chosen answer falls below its value under the reference.
 
 **Traps.** The log-probability of a response is the *sum* of the log-probabilities of its tokens, over the response tokens only; averaging over the tokens instead gives a length-normalised variant, close to SimPO. The derivation assumes that $\pi_\theta$ can represent $\pi^*$ and that preferences follow the Bradley-Terry model, and it describes the optimum of an objective over all responses: with a finite dataset, the equivalence with RLHF breaks down, which is the subject of the next question.
 :::
@@ -1367,18 +1415,18 @@ A gradient step increases the log-likelihood of the chosen answer and decreases 
 
 | Method | Data | Reference model | Idea |
 |---|---|---|---|
-| DPO (2023) | pairs | yes | closed-form RLHF |
-| IPO (2023) | pairs | yes | bounded objective, less overfitting |
-| KTO (2024) | good / bad labels | yes | prospect theory (below) |
-| ORPO (2024) | pairs | no | SFT loss + odds-ratio penalty |
-| SimPO (2024) | pairs | no | length-normalized log-probability as reward |
+| [DPO](https://www.alphaxiv.org/abs/2305.18290) (2023) | pairs | yes | closed-form RLHF |
+| [IPO](https://www.alphaxiv.org/abs/2310.12036) (2023) | pairs | yes | bounded objective, less overfitting |
+| [KTO](https://www.alphaxiv.org/abs/2402.01306) (2024) | good / bad labels | yes | prospect theory (below) |
+| [ORPO](https://www.alphaxiv.org/abs/2403.07691) (2024) | pairs | no | SFT loss + odds-ratio penalty |
+| [SimPO](https://www.alphaxiv.org/abs/2405.14734) (2024) | pairs | no | length-normalized log-probability as reward |
 
 . . .
 
 DPO is **offline**: it learns from a fixed dataset. **Online** variants regenerate pairs from the current policy, closer to RL.
 
 ::: lecture
-The papers are Azar et al. (2023) for IPO, Ethayarajh et al. (2024) for KTO, Hong et al. (2024) for ORPO and Meng et al. (2024) for SimPO. IPO addresses a weakness of DPO: when a preference in the data is deterministic, the DPO loss keeps decreasing as the margin grows, and nothing stops the policy from moving arbitrarily far from the reference. Methods without a reference model save memory and compute, and replace the KL anchor by other regularisations.
+The papers are [Azar et al. (2023)](https://www.alphaxiv.org/abs/2310.12036) for IPO, [Ethayarajh et al. (2024)](https://www.alphaxiv.org/abs/2402.01306) for KTO, [Hong et al. (2024)](https://www.alphaxiv.org/abs/2403.07691) for ORPO and [Meng et al. (2024)](https://www.alphaxiv.org/abs/2405.14734) for SimPO. IPO addresses a weakness of DPO: when a preference in the data is deterministic, the DPO loss keeps decreasing as the margin grows, and nothing stops the policy from moving arbitrarily far from the reference. Methods without a reference model save memory and compute, and replace the KL anchor by other regularisations.
 :::
 
 ## Quiz: DPO
@@ -1516,11 +1564,11 @@ A colleague argues that DPO optimises the same objective as RLHF, so that the tw
 - DPO is **offline**: it only sees the responses of the dataset. The implicit reward is constrained on these responses and nowhere else, so the policy can move probability to responses unlike any in the dataset, whose quality nothing measures. Here the responses come from an older model and are off-policy: the current model would not write them, and the gradient pushes on sequences far from its own distribution.
 - PPO is **online**: it samples from the current policy, scores the samples with the reward model and measures the KL on them. The reward model is queried on new responses, where it generalises imperfectly but still gives a signal, and the mistakes of the policy are seen, and corrected, as they appear.
 
-Xu et al. (2024) compared the two methods carefully and found that a well-tuned PPO outperformed DPO, DPO being sensitive to the shift between the distribution of the preference data and that of the model. Tajwar et al. (2024) found that sampling from the current policy and pushing down the likelihood of bad responses both matter.
+[Xu et al. (2024)](https://www.alphaxiv.org/abs/2404.10719) compared the two methods carefully and found that a well-tuned PPO outperformed DPO, DPO being sensitive to the shift between the distribution of the preference data and that of the model. [Tajwar et al. (2024)](https://www.alphaxiv.org/abs/2404.14367) found that sampling from the current policy and pushing down the likelihood of bad responses both matter.
 
-**The KL is not enforced in the same way.** In PPO, the KL penalty is estimated on the samples of the policy and does limit its drift. In DPO, $\beta$ only enters through the parametrisation of the reward. When a pair of the dataset always has the same winner, the likelihood of the data keeps increasing with the margin, and the probability of $y_l$ can be driven to zero whatever the value of $\beta$; this is the weakness that IPO addresses (Azar et al., 2023).
+**The KL is not enforced in the same way.** In PPO, the KL penalty is estimated on the samples of the policy and does limit its drift. In DPO, $\beta$ only enters through the parametrisation of the reward. When a pair of the dataset always has the same winner, the likelihood of the data keeps increasing with the margin, and the probability of $y_l$ can be driven to zero whatever the value of $\beta$; this is the weakness that IPO addresses ([Azar et al., 2023](https://www.alphaxiv.org/abs/2310.12036)).
 
-**What I would do.** The practical advantages of DPO are real: no generation during training, two models instead of four, few hyperparameters and a stable training. With this dataset, I would first bring it closer to the model, by fine-tuning the reference on the chosen answers (the DPO paper does this when no SFT model is available), then train with DPO and evaluate. If the budget allows, the next step is **iterative or online DPO**: train a reward model, or use an LLM judge, on the 100,000 pairs; then repeatedly sample pairs of answers from the current policy, label them with this judge, and run DPO on the fresh pairs (Guo et al., 2024). This keeps most of the simplicity of DPO and recovers most of the benefits of online training; Llama 3 was post-trained in several rounds of this kind, combining rejection sampling, SFT and DPO (Dubey et al., 2024). PPO, or GRPO, is worth its cost when the reward generalises far beyond the dataset, typically a verifiable reward (Section 5).
+**What I would do.** The practical advantages of DPO are real: no generation during training, two models instead of four, few hyperparameters and a stable training. With this dataset, I would first bring it closer to the model, by fine-tuning the reference on the chosen answers (the DPO paper does this when no SFT model is available), then train with DPO and evaluate. If the budget allows, the next step is **iterative or online DPO**: train a reward model, or use an LLM judge, on the 100,000 pairs; then repeatedly sample pairs of answers from the current policy, label them with this judge, and run DPO on the fresh pairs ([Guo et al., 2024](https://www.alphaxiv.org/abs/2402.04792)). This keeps most of the simplicity of DPO and recovers most of the benefits of online training; Llama 3 was post-trained in several rounds of this kind, combining rejection sampling, SFT and DPO ([Dubey et al., 2024](https://www.alphaxiv.org/abs/2407.21783)). PPO, or GRPO, is worth its cost when the reward generalises far beyond the dataset, typically a verifiable reward (Section 5).
 
 **Going further.** Online and offline, on-policy and off-policy, and the presence of a reward model are separate axes: online DPO is on-policy, but has neither a value model nor clipping. And a reward model is not wasted effort in a DPO pipeline: it is the cheapest tool to filter data, to select checkpoints and to detect reward hacking.
 :::
@@ -1528,7 +1576,7 @@ Xu et al. (2024) compared the two methods carefully and found that a well-tuned 
 ## KTO: thumbs up and thumbs down
 <!-- type: content -->
 
-Pairs are expensive to collect. **KTO** (Ethayarajh et al., 2024) learns from single answers labelled **good** or **bad**.
+Pairs are expensive to collect. **KTO** ([Ethayarajh et al., 2024](https://www.alphaxiv.org/abs/2402.01306)) learns from single answers labelled **good** or **bad**.
 
 It is inspired by *prospect theory* (Kahneman and Tversky, 1979):
 
@@ -1565,18 +1613,18 @@ The baseline $z_\text{ref}$ plays the role of the reference point of prospect th
 
 For some tasks, a program can check the answer: math with a known result, code with unit tests, logic puzzles.
 
-> The reward is computed, not learned: no human and no reward model.
+> The reward is computed by a (deterministic) algorithm, it is not learned. There is no reward model and no human in the loop.
 
 **Chain of thought**: models that write their reasoning before answering solve many more of these problems.
 
 ::: lecture
-Chain-of-thought prompting was studied by Wei et al. (2022): with a few examples of worked solutions in the prompt, large models solve many more arithmetic and reasoning problems. Reasoning models go further: they are trained, with reinforcement learning, to produce long chains of thought before answering, and the reward only checks the final answer. A verifier, such as the comparison with a known answer or the unit tests of a program, cannot be fooled the way a learned reward model can, although a model may still exploit weaknesses of the verifier itself, such as tests that do not cover all cases.
+Chain-of-thought prompting was studied by [Wei et al. (2022)](https://www.alphaxiv.org/abs/2201.11903): with a few examples of worked solutions in the prompt, large models solve many more arithmetic and reasoning problems. Reasoning models go further: they are trained, with reinforcement learning, to produce long chains of thought before answering, and the reward only checks the final answer. A verifier, such as the comparison with a known answer or the unit tests of a program, cannot be fooled the way a learned reward model can, although a model may still exploit weaknesses of the verifier itself, such as tests that do not cover all cases.
 :::
 
 ## Reinforcement learning with verifiable rewards
 <!-- type: content -->
 
-RLVR (Lambert et al., 2024) combines two kinds of rules:
+RLVR ([Lambert et al., 2024](https://www.alphaxiv.org/abs/2411.15124)) combines two kinds of rules:
 
 | Reward | Checked by | Example |
 |------|--------|---------|
@@ -1594,7 +1642,7 @@ The name RLVR, reinforcement learning with verifiable rewards, comes from the T�
 ## DeepSeek R1 (2025)
 <!-- type: content -->
 
-DeepSeek trained a reasoning model with RLVR on math and code problems, and observed:
+[DeepSeek](https://www.alphaxiv.org/abs/2501.12948) trained a reasoning model with RLVR on math and code problems, and observed:
 
 - **self-reflection**: the model backtracks on its own (*"Wait, that's wrong..."*);
 - **longer chains of thought** on harder problems;
@@ -1613,7 +1661,7 @@ R1-Zero was trained with GRPO directly from the base model DeepSeek-V3-Base. Its
 ## GRPO (Group Relative Policy Optimization)
 <!-- type: content -->
 
-DeepSeekMath (Shao et al., 2024): PPO **without the value model**. For each prompt $x$:
+DeepSeekMath ([Shao et al., 2024](https://www.alphaxiv.org/abs/2402.03300)): PPO **without the value model**. For each prompt $x$:
 
 1. sample $G$ answers $y_1, \ldots, y_G$ (a *group*);
 2. score each with the verifier: rewards $r_1, \ldots, r_G$;
@@ -1629,7 +1677,10 @@ The value model of PPO estimates the expected reward from a state; GRPO estimate
 <!-- type: content -->
 
 With $\rho_{i,t} = \pi_\theta(y_{i,t} \mid x, y_{i,<t}) / \pi_{\text{old}}(y_{i,t} \mid x, y_{i,<t})$, every token of answer $i$ gets the same advantage $A_i$:
-$$\mathcal{L}^{\text{GRPO}} = \frac{1}{G}\sum_{i=1}^{G} \frac{1}{|y_i|}\sum_{t} \min\bigl(\rho_{i,t} A_i,\ \mathrm{clip}(\rho_{i,t}, 1-\epsilon, 1+\epsilon) A_i\bigr) - \beta\, \mathrm{KL}[\pi_\theta \| \pi_{\text{ref}}]$$
+$$\begin{aligned}
+\mathcal{L}^{\text{GRPO}} = \frac{1}{G}\sum_{i=1}^{G} \frac{1}{|y_i|}\sum_{t} & \min\bigl(\rho_{i,t} A_i,\ \mathrm{clip}(\rho_{i,t}, 1-\epsilon, 1+\epsilon) A_i\bigr) \\
+& - \beta\, \mathrm{KL}[\pi_\theta \| \pi_{\text{ref}}]
+\end{aligned}$$
 
 . . .
 
@@ -1639,38 +1690,19 @@ The clipped objective of PPO, with the **group** in place of the value model.
 Unlike PPO in InstructGPT, the KL penalty is not added to the reward: it is a separate term of the objective, estimated per token with the non-negative estimator of Section 3. When each batch of samples is used for a single gradient step, the ratio equals 1 and the clipping never acts: the objective reduces to a policy gradient with group-normalised advantages. This is the version implemented from scratch in the lab. Many recipes for reasoning models also set $\beta = 0$: with a verifiable reward, there is less need to stay close to the reference.
 :::
 
-## Group advantages in code
-<!-- type: example -->
-
-```{python}
-#| eval: true
-#| echo: true
-rewards = torch.tensor([[1., 0., 0., 1., 0., 0., 0., 1.],     # prompt 1: 3 of 8 answers correct
-                        [1., 1., 1., 1., 1., 1., 1., 1.],     # prompt 2: too easy
-                        [0., 0., 0., 0., 0., 0., 0., 0.]])    # prompt 3: too hard
-adv = (rewards - rewards.mean(1, keepdim=True)) / (rewards.std(1, keepdim=True) + 1e-6)
-print(adv.round(decimals=2))
-```
-
-Prompts where all answers agree give **zero advantage**: no learning signal. Useful prompts are those the model solves *sometimes*.
-
-::: lecture
-In the first group, the three correct answers get a positive advantage and the five wrong ones a negative advantage, and the advantages sum to zero. Note the asymmetry: the rarer the correct answers, the larger their advantage. This is why the difficulty of the training prompts matters so much in practice: a curriculum keeps the model on problems it solves part of the time.
-:::
-
 ## Fixing GRPO (2025)
 <!-- type: content -->
 
-- **Dr. GRPO** (Liu et al.): dividing by $|y_i|$ favours long wrong answers and short right ones, and dividing by $\sigma_r$ over-weights prompts that are too easy or too hard. Remove both normalisations.
-- **DAPO** (Yu et al., ByteDance): a higher upper clipping bound (more exploration), **dynamic sampling** (drop the groups with zero advantage), averaging over all the tokens of the batch, a penalty for overlong answers.
-- **GSPO** (Zheng et al., Qwen): one importance ratio per answer instead of one per token, more stable for mixtures of experts.
+- **Dr. GRPO** ([Liu et al.](https://www.alphaxiv.org/abs/2503.20783)): dividing by $|y_i|$ favours long wrong answers and short right ones, and dividing by $\sigma_r$ over-weights prompts that are too easy or too hard. Remove both normalisations.
+- **DAPO** ([Yu et al.](https://www.alphaxiv.org/abs/2503.14476), ByteDance): a higher upper clipping bound (more exploration), **dynamic sampling** (drop the groups with zero advantage), averaging over all the tokens of the batch, a penalty for overlong answers.
+- **GSPO** ([Zheng et al.](https://www.alphaxiv.org/abs/2507.18071), Qwen): one importance ratio per answer instead of one per token, more stable for mixtures of experts.
 
 . . .
 
 Most of these are options of `GRPOConfig` in TRL (`loss_type`, `scale_rewards`, `epsilon_high`, `importance_sampling_level`).
 
 ::: lecture
-The length bias works as follows. The loss of an answer is averaged over its tokens, so for a wrong answer, with a negative advantage, each token of a long answer is penalised less than each token of a short one; for a right answer, each token of a short answer is rewarded more. Over training, wrong answers tend to get longer, which can be mistaken for the model "thinking more". Dividing by the standard deviation $\sigma_r$ gives the largest weight to the groups where the rewards barely vary, that is to prompts that are almost always or almost never solved. GSPO starts from another observation: the per-token ratios $\rho_{i,t}$ are noisy, and in a mixture of experts a small change of the weights can route a token to other experts and change its probability a lot. A single ratio per answer, the geometric mean of the token ratios, is clipped instead. CISPO (MiniMax, 2025) keeps the per-token ratios but clips their value rather than dropping the gradient of the clipped tokens.
+The length bias works as follows. The loss of an answer is averaged over its tokens, so for a wrong answer, with a negative advantage, each token of a long answer is penalised less than each token of a short one; for a right answer, each token of a short answer is rewarded more. Over training, wrong answers tend to get longer, which can be mistaken for the model "thinking more". Dividing by the standard deviation $\sigma_r$ gives the largest weight to the groups where the rewards barely vary, that is to prompts that are almost always or almost never solved. GSPO starts from another observation: the per-token ratios $\rho_{i,t}$ are noisy, and in a mixture of experts a small change of the weights can route a token to other experts and change its probability a lot. A single ratio per answer, the geometric mean of the token ratios, is clipped instead. CISPO ([MiniMax, 2025](https://www.alphaxiv.org/abs/2506.13585)) keeps the per-token ratios but clips their value rather than dropping the gradient of the clipped tokens.
 :::
 
 ## Interview: which prompts teach a reasoning model? {.interview}
@@ -1685,7 +1717,7 @@ Which prompts give the strongest learning signal? What fraction of the groups gi
 $$A_+ = \frac{1 - \hat p}{\sqrt{\hat p(1 - \hat p)}} = \sqrt{\frac{1 - \hat p}{\hat p}}, \qquad \text{and a wrong one} \qquad A_- = -\sqrt{\frac{\hat p}{1 - \hat p}}.$$
 With one correct answer out of 8, the correct one gets $\sqrt 7 \approx 2.65$ and each wrong one $-1/\sqrt 7 \approx -0.38$; with seven correct answers, it is the reverse. The rare outcome receives the large advantage: a success on a hard prompt is strongly reinforced, and a failure on an easy prompt strongly penalised.
 
-**The expected signal of a prompt.** Without the division by the standard deviation, the advantage is $r - \hat p$, and in expectation the gradient of a prompt is proportional to the gradient of its success probability, $\nabla_\theta p$, since the baseline does not bias it (see the policy gradient question of Section 3). This gradient vanishes when $p$ tends to 0 or 1: in the toy model of the lab, where $p = \sigma(\theta)$, it is $p(1 - p)$, largest at $p = 1/2$. Dividing by the standard deviation multiplies the signal of a prompt by roughly $1/\sqrt{p(1-p)}$, which partly compensates. Since $\frac{d}{dp}\, 2\arcsin\sqrt p = 1/\sqrt{p(1-p)}$, GRPO roughly ascends $\sum_x 2 \arcsin \sqrt{p_x}$ rather than the average accuracy $\sum_x p_x$, a reweighting towards the prompts that are almost always or almost never solved, which is what Dr. GRPO criticises.
+**The expected signal of a prompt.** Without the division by the standard deviation, the advantage is $r - \hat p$, and in expectation the gradient of a prompt is proportional to the gradient of its success probability, $\nabla_\theta p$, since the baseline does not bias it (Section 3). This gradient vanishes when $p$ tends to 0 or 1: in the toy model of the lab, where $p = \sigma(\theta)$, it is $p(1 - p)$, largest at $p = 1/2$. Dividing by the standard deviation multiplies the signal of a prompt by roughly $1/\sqrt{p(1-p)}$, which partly compensates. Since $\frac{d}{dp}\, 2\arcsin\sqrt p = 1/\sqrt{p(1-p)}$, GRPO roughly ascends $\sum_x 2 \arcsin \sqrt{p_x}$ rather than the average accuracy $\sum_x p_x$, a reweighting towards the prompts that are almost always or almost never solved, which is what Dr. GRPO criticises.
 
 **Empty groups.** A group gives no signal when all its answers agree, which happens with probability $p^G + (1 - p)^G$. For $G = 8$, this is 0.8% of the groups at $p = 0.5$, 43% at $p = 0.9$, 66% at $p = 0.95$ or $p = 0.05$, and 92% at $p = 0.01$. Each empty group is generation compute spent for nothing, and as training succeeds the prompts become easy, so the fraction of empty groups grows.
 
@@ -1707,7 +1739,27 @@ With one correct answer out of 8, the correct one gets $\sqrt 7 \approx 2.65$ an
 - **RL** *sharpens* the distribution towards high-reward answers, and lowers its entropy. (Illustrative numbers.)
 
 ::: lecture
-This is the difference between the two directions of the KL divergence of Section 3. SFT minimises the KL from the data to the model and must cover every answer of the data. RL maximises a reward under a KL penalty from the policy to the reference, and may drop most of the answers of the reference to concentrate on those with a high reward. A drop of entropy reduces exploration: RL training often adds measures to keep it, such as the higher clipping bound of DAPO. It also affects calibration, as Section 6 shows: the probabilities of a sharpened model no longer reflect how often it is right.
+This is the difference between the two directions of the KL divergence, seen at the beginning of the lecture. SFT minimises the KL from the data to the model and must cover every answer of the data. RL maximises a reward under a KL penalty from the policy to the reference, and may drop most of the answers of the reference to concentrate on those with a high reward. A drop of entropy reduces exploration: RL training often adds measures to keep it, such as the higher clipping bound of DAPO. It also affects calibration, as Section 6 shows: the probabilities of a sharpened model no longer reflect how often it is right.
+:::
+
+## pass@k
+<!-- type: content -->
+
+Sample $k$ answers to a problem: **pass@k** is the probability that **at least one** of them is correct,
+$$\mathrm{pass@}k = 1 - (1 - p)^k \quad \text{for a problem solved with probability } p.$$
+It measures **coverage**, and needs an oracle that recognises a correct answer, such as unit tests ([Chen et al., 2021](https://www.alphaxiv.org/abs/2107.03374)).
+
+. . .
+
+Variants:
+
+- **avg@k**: each correct answer counts for $1/k$; it estimates pass@1 with less noise.
+- **maj@k**, or cons@k: the most frequent answer is correct; no oracle needed.
+- **best-of-k**: the answer chosen by a verifier is correct.
+- **pass^k**: **all** $k$ answers are correct; it measures reliability.
+
+::: lecture
+On a benchmark, pass@k is the average of the per-problem values. For a single problem, pass^k is $p^k$, so pass^k $\leq$ pass@1 $\leq$ pass@k, with equality at $k = 1$. avg@k is the accuracy averaged over $k$ samples per problem: it estimates pass@1, and is preferred on small benchmarks such as AIME (30 problems), where a single sample per problem gives a noisy score. maj@k is the self-consistency of [Wang et al. (2023)](https://www.alphaxiv.org/abs/2203.11171): the final answers are compared and the most frequent one is kept, which needs no oracle but only works when answers can be compared, as in math; the DeepSeek R1 report gives cons@64 next to pass@1. It usually lies between pass@1 and pass@k, and can fall below pass@1 when the most frequent answer is wrong. best-of-k replaces the vote by a reward model or a verifier, and measures the pair: a perfect verifier gives pass@k. pass^k was introduced by [Yao et al. (2024)](https://www.alphaxiv.org/abs/2406.12045) for agents: a customer service agent that succeeds 60% of the time succeeds on 8 trials in a row with probability $0.6^8 \approx 1.7\%$, which is the relevant number for a deployed system. The estimation of pass@k from a finite number of samples is the subject of the interview question below.
 :::
 
 ## Does RL create new abilities?
@@ -1715,15 +1767,58 @@ This is the difference between the two directions of the KL divergence of Sectio
 
 An open debate:
 
-- Yue et al. (2025) compare **pass@k**, the probability that at least one of $k$ samples is correct. RL models win for small $k$, but base models catch up for large $k$: RL mostly **sharpens** what the base model can already do.
-- Longer RL training finds strategies the base model does not sample (ProRL, Liu et al., 2025), and **distillation** transfers them: small Qwen and Llama models fine-tuned on 800,000 R1 traces beat much larger models in math.
+- [Yue et al. (2025)](https://www.alphaxiv.org/abs/2504.13837) compare **pass@k**: RL models win for small $k$, base models catch up for large $k$, so RL **sharpens**.
+- On hard chess puzzles, RL finds correct moves that the SFT model played less than 5% of the time, and puts them in its top 3 ([Shen et al., 2026](https://www.alphaxiv.org/abs/2607.16097)). On other puzzles, it reinforces wrong moves instead.
+- On an AIME problem solved 3.9% of the time, RL reaches 10.2% with a binary reward and 92.2% with a process reward ([Clay et al., 2026](https://www.alphaxiv.org/abs/2608.24949)).
 
 . . .
 
-So far: pre-training sets the ceiling; RL and distillation move models towards it.
+With a sparse reward, RL mostly reweights what the model already samples; denser rewards reach further, but never answers of probability zero.
 
 ::: lecture
-The pass@k comparison asks whether RL adds answers to the support of the distribution or only reweights it: with many samples, the base model finds the correct answer for problems on which the RL model has become too confident in a wrong one. Distillation tells a complementary story: a small model fine-tuned on the reasoning traces of a large one learns behaviours that it would not find by RL on its own, for lack of ever sampling them. RL has another property, measured by Shenfeld et al. (2025) under the name *RL's razor*: at equal gain on the new task, it forgets less of the old ones than SFT, because on-policy updates move the model to a nearby distribution, in KL, while SFT pulls it towards the distribution of the labels, wherever it is. Section 7 uses this observation. The lab shows the limitation at a small scale: RL only reinforces what the model already produces sometimes.
+The pass@k comparison asks whether RL adds answers to the support of the distribution or only reweights it: with many samples, the base model finds the correct answer for problems on which the RL model has become too confident in a wrong one. Two 2026 studies control the starting distribution. Shen et al. pretrain models from 5M to 1B parameters on human chess games, fine-tune them on reasoning traces and run GRPO on puzzles. On easy puzzles, RL amplifies the moves that the SFT model already preferred; on hard ones, it brings some correct moves up from the tail and amplifies wrong ones in others, which is why pass@1 improves more than pass@k. They also find that the pretraining loss predicts the performance after RL, and that the compute-optimal share of RL grows with the total budget. Clay et al. manipulate the probability of a target behaviour by fine-tuning it in or out before RL. With a binary reward, RL succeeds only if this probability is not negligible: if fine-tuning has pushed it to zero, nothing is ever sampled and nothing is learned. With a dense reward, here a process reward model that credits each correct intermediate step, RL learns behaviours that the model almost never produced at first, as reward shaping does in classical RL.
+
+Distillation gives another view: small Qwen and Llama models fine-tuned on 800,000 reasoning traces of DeepSeek R1 beat much larger models in math, so they learn behaviours that they would not find by RL on their own, for lack of ever sampling them. RL has another property, measured by [Shenfeld et al. (2025)](https://www.alphaxiv.org/abs/2509.04259) under the name *RL's razor*: at equal gain on the new task, it forgets less of the old ones than SFT, because on-policy updates move the model to a nearby distribution, in KL, while SFT pulls it towards the distribution of the labels, wherever it is. Section 7 uses this observation. The lab shows the limitation at a small scale: RL only reinforces what the model already produces sometimes.
+:::
+
+## Maximum likelihood RL (2026)
+<!-- type: content -->
+
+With a binary reward, the model solves the prompt $x$ with probability $p = p_\theta(x)$. RL maximises $p$; maximum likelihood, as in SFT, maximises $\log p$:
+
+$$\nabla_\theta \log p = \frac{1}{p}\, \nabla_\theta p = \sum_{k \geq 1} \frac{1}{k}\, \nabla_\theta\, \mathrm{pass@}k$$
+
+- RL keeps only the first term, pass@1: hard prompts get little weight.
+- **MaxRL** ([Tajwar et al., 2026](https://www.alphaxiv.org/abs/2602.02710)) keeps the first $N$ terms, with $N$ answers per prompt (next slide): more answers bring it **closer to maximum likelihood**, while in GRPO they only reduce the variance.
+
+. . .
+
+On Qwen3-1.7B and 4B, MaxRL matches or beats GRPO in pass@1 and improves pass@k: up to **20×** fewer samples for the same pass@k with a verifier.
+
+::: lecture
+The identity comes from the expansion $\log p = -\sum_{k \geq 1} (1 - p)^k / k$, where $(1 - p)^k$ is the probability that $k$ independent answers all fail, that is $1 - \mathrm{pass@}k$. So maximum likelihood is a mixture of all the pass@k objectives, and expected-reward RL is its first-order approximation. The paper also proves that the gradient of $\log p$ is the average of $\nabla_\theta \log \pi_\theta(y \mid x)$ over the *correct* answers only. The next slide turns this into an estimator.
+
+At the level of a prompt, the methods differ by the weight $w(p)$ in the gradient $w(p)\, \nabla_\theta p$: $1$ for REINFORCE, about $1/\sqrt{p(1-p)}$ for GRPO (see the interview question on prompts above), $\big(1 - (1-p)^N\big)/p$ for MaxRL and $1/p$ for maximum likelihood. MaxRL gives the hard prompts almost the weight of maximum likelihood, and unlike GRPO it does not increase the weight of the very easy ones. The experiments train Qwen3-1.7B-Base and Qwen3-4B-Base on about 50,000 math problems with 16 answers per prompt; on AIME 2025, BeyondAIME, MATH-500 and Minerva, MaxRL matches or beats GRPO in pass@1, and improves pass@k over both the base model and GRPO in 7 settings out of 8, while GRPO loses coverage at large $k$. Reaching the same pass@k with a perfect verifier takes 2.3 to 19.2 times fewer samples. Tail-Likelihood RL ([Ramasubramanian et al., 2026](https://www.alphaxiv.org/abs/2609.02987)) extends the idea to continuous rewards.
+:::
+
+## MaxRL: the algorithm
+<!-- type: content -->
+
+For each prompt $x$, sample $N$ answers; $K$ of them are correct, and $\hat p = K / N$.
+
+1. If $K = 0$, skip the prompt: without a correct answer, there is no signal.
+2. Average the gradients of the **correct answers only**, dividing by $K$ instead of $N$:
+$$g = \frac{1}{K} \sum_{i:\ r_i = 1} \nabla_\theta \log \pi_\theta(y_i \mid x), \qquad \mathbb{E}[g] = \sum_{k=1}^{N} \frac{1}{k}\, \nabla_\theta\, \mathrm{pass@}k$$
+3. Subtract a baseline: the advantage is $A_i = (r_i - \hat p) / \hat p$, that is $(1 - \hat p)/\hat p$ for a correct answer and $-1$ for a wrong one.
+
+. . .
+
+One correct answer out of 16 gets the advantage 15 in MaxRL, against $\sqrt{15} \approx 3.9$ in GRPO.
+
+::: lecture
+The estimator rests on a second identity: the gradient of $\log p$ is the average of $\nabla_\theta \log \pi_\theta(y \mid x)$ over the correct answers only, $\nabla_\theta \log p = \mathbb{E}\big[\nabla_\theta \log \pi_\theta(y \mid x) \mid r(x, y) = 1\big]$. Averaging over the $K$ correct answers of the group estimates this conditional expectation, and the estimate exists only when $K \geq 1$, which happens with probability $1 - (1 - p)^N$. Hence $\mathbb{E}[g] = \big(1 - (1-p)^N\big)\, \nabla_\theta \log p$. Since $\nabla_\theta\, \mathrm{pass@}k = k (1 - p)^{k-1} \nabla_\theta p$, the sum of the first $N$ terms of the series is $\sum_{k=1}^{N} (1-p)^{k-1}\, \nabla_\theta p = \frac{1 - (1-p)^N}{p}\, \nabla_\theta p$, the same quantity. With $N = 1$, it is the gradient of pass@1, as in REINFORCE; as $N$ grows, it tends to $\nabla_\theta \log p$.
+
+REINFORCE divides the same sum by $N$: the difference is only the normalisation, $1/K$ instead of $1/N$, which multiplies the signal of a prompt by $1/\hat p$. Subtracting the baseline $\frac{1}{N}\sum_i \nabla_\theta \log \pi_\theta(y_i \mid x)$, whose expectation is zero, gives the gradient $\sum_i (r_i / K - 1/N)\, \nabla_\theta \log \pi_\theta(y_i \mid x) = \frac{1}{N} \sum_i \frac{r_i - \hat p}{\hat p}\, \nabla_\theta \log \pi_\theta(y_i \mid x)$, which is the advantage of the slide up to the factor $1/N$. GRPO divides $r_i - \hat p$ by the standard deviation $\hat\sigma = \sqrt{\hat p (1 - \hat p)}$ instead of $\hat p$: for a hard prompt, $\hat p$ is much smaller than $\hat\sigma$, so MaxRL gives a rare success a much larger weight. In a GRPO implementation, MaxRL only changes the formula of the advantage.
 :::
 
 ## Interview: estimating pass@k {.interview}
@@ -1734,7 +1829,7 @@ To compare a base model with its RL-trained version, you want their pass@k on a 
 How do you estimate pass@k? Why not use $1 - (1 - c/n)^k$?
 
 ::: answer
-**The unbiased estimator.** pass@k is the probability that at least one of $k$ independent samples is correct, $1 - (1 - p)^k$ for a problem with success probability $p$. Chen et al. (2021) estimate it from $n \ge k$ samples by averaging over all the subsets of $k$ of them. A random subset contains no correct sample with probability $\binom{n - c}{k} / \binom{n}{k}$, hence
+**The unbiased estimator.** pass@k is the probability that at least one of $k$ independent samples is correct, $1 - (1 - p)^k$ for a problem with success probability $p$. [Chen et al. (2021)](https://www.alphaxiv.org/abs/2107.03374) estimate it from $n \ge k$ samples by averaging over all the subsets of $k$ of them. A random subset contains no correct sample with probability $\binom{n - c}{k} / \binom{n}{k}$, hence
 $$\widehat{\text{pass@}k} = 1 - \frac{\binom{n-c}{k}}{\binom{n}{k}}.$$
 Each subset of $k$ samples is itself a set of $k$ independent samples, so the estimator is unbiased, and using all the subsets gives a lower variance than splitting the $n$ samples into $n/k$ disjoint groups. The binomial coefficients overflow quickly, so the ratio is computed as a product:
 ```python
@@ -1746,24 +1841,31 @@ def pass_at_k(n, c, k):
 
 **Why not plug in $\hat p = c/n$.** The function $p \mapsto 1 - (1-p)^k$ is concave, so by Jensen's inequality the plug-in estimate is biased downwards, and the bias is largest exactly where the comparison of the question is decided: on problems with few correct samples, at large $k$. With $n = 200$, $c = 1$ and $k = 100$, the unbiased estimate is $1 - \binom{199}{100}/\binom{200}{100} = 1 - 100/200 = 0.5$, which is right, since half of the subsets of 100 samples contain the correct one, while the plug-in estimate is $1 - 0.995^{100} \approx 0.39$.
 
-**Reading the curves.** pass@1 is the average accuracy, while pass@k at large $k$ measures coverage: whether correct answers have a non-negligible probability at all. Yue et al. (2025) found that RL models have a higher pass@1 but are overtaken by their base models at large $k$ (slide above), the signature of a distribution concentrated on fewer answers. Two precautions make such a comparison sound. The sampling temperature must be reported, and ideally tuned for each $k$, since diverse samples help at large $k$: Chen et al. found that the best temperature for their models was about 0.2 for pass@1 and 0.8 for pass@100. And most of the uncertainty comes from the choice of the problems, so the confidence intervals should be computed by bootstrap over problems rather than over samples.
+**Reading the curves.** pass@1 is the average accuracy, while pass@k at large $k$ measures coverage: whether correct answers have a non-negligible probability at all. [Yue et al. (2025)](https://www.alphaxiv.org/abs/2504.13837) found that RL models have a higher pass@1 but are overtaken by their base models at large $k$ (slide "Does RL create new abilities?"), the signature of a distribution concentrated on fewer answers. Two precautions make such a comparison sound. The sampling temperature must be reported, and ideally tuned for each $k$, since diverse samples help at large $k$: Chen et al. found that the best temperature for their models was about 0.2 for pass@1 and 0.8 for pass@100. And most of the uncertainty comes from the choice of the problems, so the confidence intervals should be computed by bootstrap over problems rather than over samples.
 
-**Going further.** pass@k assumes an oracle that recognises the correct answer among $k$. Unit tests provide one for code, but for most tasks no such oracle exists at deployment. What can be deployed is majority voting, maj@k, also called self-consistency (Wang et al., 2023), or best-of-$k$ with a learned verifier; both usually lie between pass@1 and pass@k, and the gap to pass@k measures how much a better verifier would gain. Coverage keeps growing with the number of samples on many tasks (Brown et al., 2024), which makes repeated sampling with a good verifier a form of test-time compute (next slide).
+**Going further.** pass@k assumes an oracle that recognises the correct answer among $k$. Unit tests provide one for code, but for most tasks no such oracle exists at deployment. What can be deployed is majority voting, maj@k, also called self-consistency ([Wang et al., 2023](https://www.alphaxiv.org/abs/2203.11171)), or best-of-$k$ with a learned verifier; both usually lie between pass@1 and pass@k, and the gap to pass@k measures how much a better verifier would gain. Coverage keeps growing with the number of samples on many tasks ([Brown et al., 2024](https://www.alphaxiv.org/abs/2407.21787)), which makes repeated sampling with a good verifier a form of test-time compute (next slide).
 :::
 
 ## Test-time compute
 <!-- type: content -->
 
-Reasoning models (OpenAI o1, September 2024; DeepSeek R1, January 2025) add a new scaling axis: **thinking longer** at inference.
+Reasoning models ([OpenAI o1](https://www.alphaxiv.org/abs/2412.16720), September 2024; [DeepSeek R1](https://www.alphaxiv.org/abs/2501.12948), January 2025) add a new scaling axis: the **compute spent at inference**.
 
 . . .
 
-- Accuracy grows with the length of the chain of thought, on math and code.
-- Thinking budgets are now a product setting ("low", "medium", "high").
-- Inference-time search (best-of-N, verifiers, Part 8) is the explicit version of the same idea.
+Two ways to spend more compute on a question:
+
+- **Think longer** (sequential): accuracy grows with the length of the chain of thought, on math and code. Thinking budgets are now a product setting ("low", "medium", "high").
+- **Search** (parallel): sample $N$ answers and keep one, by majority vote (maj@k), by a verifier (best-of-$N$), or by a beam search over the steps guided by a PRM.
+
+. . .
+
+The best method depends on the difficulty of the question. Choosing it per question, a small model can beat a model **14×** larger at equal FLOPs, on problems it solves sometimes ([Snell et al., 2024](https://www.alphaxiv.org/abs/2408.03314)).
 
 ::: lecture
 The pre-training scaling laws relate the loss to the compute spent on training. Reasoning models add a second axis, the compute spent per question at inference. For the same accuracy, it can be cheaper to let a smaller model think longer than to train a larger one; but the cost is paid at each query rather than once, so the trade-off depends on how many queries the model will serve.
+
+The two ways are complementary. A reasoning model spends its compute inside a single answer: it has learned, by RL, to check and revise its own steps. Search spends it across answers and needs a way to choose among them: majority voting needs answers that can be compared, best-of-$N$ needs a verifier or a reward model, and a beam search keeps, after each step, the partial answers that a process reward model scores best (slide "Outcome and process rewards"). Repeated sampling raises pass@k steadily with $N$ on many tasks ([Brown et al., 2024](https://www.alphaxiv.org/abs/2407.21787)), so the bottleneck is the choice of the answer: a perfect verifier would reach pass@k. [Snell et al. (2024)](https://www.alphaxiv.org/abs/2408.03314) compare search against a PRM with sequential revisions by the model, on MATH. The best strategy depends on the difficulty of the question, so they estimate the difficulty and allocate the compute per question; this is more than 4 times as efficient as best-of-$N$. In a FLOPs-matched comparison, test-time compute lets a model outperform a 14 times larger one on the problems where it already has a non-trivial success rate, but not on the hardest ones, where pre-training compute remains more useful. Session 5 of the course covers decoding and inference in more detail.
 :::
 
 ## Quiz: GRPO
@@ -2010,19 +2112,21 @@ The success of RLVR on math and code raised the question of how far it extends. 
 
 For each prompt, a **rubric**: a list of weighted criteria that a good answer must meet.
 
-> *Mentions that the symptoms require urgent care* (essential) · *Asks about current medication* (important) · *Recommends a specific drug dose* (pitfall)
+> - *Mentions that the symptoms require urgent care* (essential)
+> - *Asks about current medication* (important)
+> - *Recommends a specific drug dose* (pitfall)
 
 A judge model checks each criterion; the reward is the weighted fraction of criteria met.
 
 . . .
 
-Rubrics as Rewards (Gunjal et al., 2025): up to 31% better (relative) than a judge giving a single score, on HealthBench.
+Rubrics as Rewards ([Gunjal et al., 2025](https://www.alphaxiv.org/abs/2507.17746)): up to 31% better (relative) than a judge giving a single score, on HealthBench.
 
 ::: lecture
-A judge asked for a single score of 1 to 10 is a reward model in disguise, with the same weaknesses: it prefers long and confident answers, and can be hacked. A rubric splits the judgement into checks that are each close to verifiable, such as "the answer mentions X", which a smaller judge can make reliably. The rubrics are written per prompt, by experts or by a strong model given a reference answer; HealthBench (OpenAI, 2025) is an evaluation of medical conversations graded with rubrics written by physicians. Checklists generated automatically from the instruction play the same role for instruction following (Viswanathan et al., 2025). Rubrics move the human effort from comparing answers to writing criteria, as constitutions did for preferences.
+A judge asked for a single score of 1 to 10 is a reward model in disguise, with the same weaknesses: it prefers long and confident answers, and can be hacked. A rubric splits the judgement into checks that are each close to verifiable, such as "the answer mentions X", which a smaller judge can make reliably. The rubrics are written per prompt, by experts or by a strong model given a reference answer; HealthBench ([OpenAI, 2025](https://www.alphaxiv.org/abs/2505.08775)) is an evaluation of medical conversations graded with rubrics written by physicians. Checklists generated automatically from the instruction play the same role for instruction following ([Viswanathan et al., 2025](https://www.alphaxiv.org/abs/2507.18624)). Rubrics move the human effort from comparing answers to writing criteria, as constitutions did for preferences.
 :::
 
-## Binary rewards teach guessing
+## Binary rewards imply guessing
 <!-- type: content -->
 
 With the reward $\mathbb{1}[\text{correct}]$, a model that is right with probability $p$ gets:
@@ -2034,27 +2138,30 @@ With the reward $\mathbb{1}[\text{correct}]$, a model that is right with probabi
 
 . . .
 
-Answering always wins, even when $p = 0.01$: RLVR trains the model to **guess with confidence**, like an exam without negative marking.
+It is always better to answer something, so RLVR trains the model to **guess with confidence**.
 
 ::: lecture
-Kalai et al. (2025) argue that this explains a large part of hallucinations: most training rewards and most benchmarks grade answers as right or wrong, and abstaining scores zero, so a model that guesses always looks better than a model that admits its uncertainty. The probabilities of the model suffer as well. Pre-trained models are fairly well calibrated: among the answers they give a probability of 0.8, about 80% are right. The GPT-4 technical report (OpenAI, 2023) showed that post-training degraded this calibration, and RL sharpens the distribution further (Section 5).
+[Kalai et al. (2025)](https://www.alphaxiv.org/abs/2509.04664) argue that this explains a large part of hallucinations: most training rewards and most benchmarks grade answers as right or wrong, and abstaining scores zero, so a model that guesses always looks better than a model that admits its uncertainty. The probabilities of the model suffer as well. Pre-trained models are fairly well calibrated: among the answers they give a probability of 0.8, about 80% are right. The GPT-4 technical report ([OpenAI, 2023](https://www.alphaxiv.org/abs/2303.08774)) showed that post-training degraded this calibration, and RL sharpens the distribution further (Section 5).
 :::
 
 ## Rewarding calibrated confidence
 <!-- type: content -->
 
-**RLCR** (Damani et al., 2025): the model gives an answer $y$ and a confidence $q \in [0, 1]$. With $c = \mathbb{1}[y \text{ correct}]$:
+**RLCR** ([Damani et al., 2025](https://www.alphaxiv.org/abs/2507.16806)): the model gives an answer $y$ and a confidence $q \in [0, 1]$. With $c = \mathbb{1}[y \text{ correct}]$:
 
 $$R(y, q) = c - (q - c)^2$$
 
 . . .
 
-- The **Brier score** $(q - c)^2$ is a *proper scoring rule*: its expected value $(q - p)^2 + p(1 - p)$ is minimal at $q = p$.
+The penalty $(q - c)^2$ is the **Brier score**. If $y$ is correct with probability $p$, its expected value is
+$$\mathbb{E}\big[(q - c)^2\big] = p\,(1 - q)^2 + (1 - p)\, q^2 = (q - p)^2 + p\,(1 - p),$$
+smallest at $q = p$.
+
 - The best policy gives its most likely answer, with its true probability of being right.
 - Same accuracy as RLVR, much better calibration, also outside the training domain.
 
 ::: lecture
-A scoring rule is proper when the forecaster minimises its expected penalty by reporting its true belief. The Brier score is one, and so is the log score $-\log q$ (or $-\log(1 - q)$ when the answer is wrong). Damani et al. prove that the correctness term and a bounded proper scoring rule can be added without conflict: the reward is maximised by the answer most likely to be correct, stated with its probability of being correct. An unbounded rule such as the log score does not have this property, since its penalty for a confident wrong answer is infinite. In their experiments, the model writes its reasoning, then the answer, then an analysis of its uncertainty and the confidence; on question answering and math, accuracy is unchanged while the calibration error drops sharply, including on datasets not seen in training. A stated confidence also helps at test time: when several answers are sampled, a vote weighted by confidence beats a plain majority vote.
+The Brier score is a *proper scoring rule*: a scoring rule is proper when the forecaster minimises its expected penalty by reporting its true belief, which is what the computation on the slide shows. Another one is the log score $-\log q$ (or $-\log(1 - q)$ when the answer is wrong). Damani et al. prove that the correctness term and a bounded proper scoring rule can be added without conflict: the reward is maximised by the answer most likely to be correct, stated with its probability of being correct. An unbounded rule such as the log score does not have this property, since its penalty for a confident wrong answer is infinite. In their experiments, the model writes its reasoning, then the answer, then an analysis of its uncertainty and the confidence; on question answering and math, accuracy is unchanged while the calibration error drops sharply, including on datasets not seen in training. A stated confidence also helps at test time: when several answers are sampled, a vote weighted by confidence beats a plain majority vote.
 :::
 
 ## Decisions instead of text: Jev
@@ -2086,10 +2193,11 @@ An encoder reads the state once; each question gets a **distribution** $\pi_\the
 
 . . .
 
-With known answers, the log score is the cross-entropy: SFT. RL is needed when only the **outcome** of a decision is observed.
+- If we know the answers, we use **SFT** with the cross-entropy, which is the log score.
+- If we only know the **outcome** of a decision, we use **RL**.
 
 ::: lecture
-For a single question with options $a$, suppose that the correct option is distributed as $p(a \mid s)$. The expected accuracy reward is $\sum_a \pi(a \mid s)\, p(a \mid s)$, which is linear in $\pi$ and maximised by a point mass on the most likely option: the policy becomes deterministic, and its probabilities say nothing about its chances of being right. Scoring the distribution itself with a proper rule gives instead $\pi = p$. This is the classifier setting of an encoder fine-tuned with a cross-entropy head, as in Part 6, and the lesson of RLCR applies to it directly. Two practical points remain. A network trained with the cross-entropy is calibrated in expectation but becomes overconfident when it overfits, and rescaling its logits by a temperature fitted on held-out data fixes much of this (Guo et al., 2017). And when the right option is unknown but the effect of a decision can be observed, as for an agent in a game, the problem is a *contextual bandit*: one option is sampled, its outcome is scored, and the policy gradient of Section 3 applies with episodes of a single step. Answering all the questions in parallel means that they are conditionally independent given the state: there is no chain of thought, which is the price of speed.
+For a single question with options $a$, suppose that the correct option is distributed as $p(a \mid s)$. The expected accuracy reward is $\sum_a \pi(a \mid s)\, p(a \mid s)$, which is linear in $\pi$ and maximised by a point mass on the most likely option: the policy becomes deterministic, and its probabilities say nothing about its chances of being right. Scoring the distribution itself with a proper rule gives instead $\pi = p$. This is the classifier setting of an encoder fine-tuned with a cross-entropy head, as in Part 6, and the lesson of RLCR applies to it directly. Two practical points remain. A network trained with the cross-entropy is calibrated in expectation but becomes overconfident when it overfits, and rescaling its logits by a temperature fitted on held-out data fixes much of this ([Guo et al., 2017](https://www.alphaxiv.org/abs/1706.04599)). And when the right option is unknown but the effect of a decision can be observed, as for an agent in a game, the problem is a *contextual bandit*: one option is sampled, its outcome is scored, and the policy gradient of Section 3 applies with episodes of a single step. Answering all the questions in parallel means that they are conditionally independent given the state: there is no chain of thought, which is the price of speed.
 :::
 
 ## Interview: calibrating a reasoning model {.interview}
@@ -2104,7 +2212,7 @@ Explain why. How would you change the reward so that the model's confidence beco
 
 **Rewarding abstention.** A first fix gives $+1$ for a right answer, $-\lambda$ for a wrong one and $0$ for an abstention. Answering is then worth $p - \lambda(1 - p)$, which is positive when $p > \lambda / (1 + \lambda)$: with $\lambda = 1$, the model should answer when it is more than 50% sure. This sets a single threshold, chosen in advance, and gives no graded confidence.
 
-**A proper scoring rule.** RLCR (Damani et al., 2025) asks the model for an answer and a confidence $q$, and adds the Brier score: $R = c - (q - c)^2$ with $c = \mathbb{1}[\text{correct}]$. For a fixed answer right with probability $p$, $\mathbb{E}[(q - c)^2] = (q - p)^2 + p(1 - p)$, minimal at $q = p$, so the best policy reports its true probability. The correctness term keeps the incentive to find the right answer, and with a bounded rule the two terms do not conflict. The log score is also proper but unbounded: a confident wrong answer costs an arbitrarily large penalty, which dominates the reward and makes training unstable. With the confidence in hand, the downstream system can choose its own abstention threshold, for instance per application.
+**A proper scoring rule.** RLCR ([Damani et al., 2025](https://www.alphaxiv.org/abs/2507.16806)) asks the model for an answer and a confidence $q$, and adds the Brier score: $R = c - (q - c)^2$ with $c = \mathbb{1}[\text{correct}]$. For a fixed answer right with probability $p$, $\mathbb{E}[(q - c)^2] = (q - p)^2 + p(1 - p)$, minimal at $q = p$, so the best policy reports its true probability. The correctness term keeps the incentive to find the right answer, and with a bounded rule the two terms do not conflict. The log score is also proper but unbounded: a confident wrong answer costs an arbitrarily large penalty, which dominates the reward and makes training unstable. With the confidence in hand, the downstream system can choose its own abstention threshold, for instance per application.
 
 **Checking.**
 
@@ -2121,12 +2229,12 @@ Explain why. How would you change the reward so that the model's confidence beco
 
 Can the model reward itself, on questions without known answers?
 
-- **TTRL** (Zuo et al., 2025): sample a group, take the **majority answer** as the label, reward agreement with it.
-- **INTUITOR** (Zhao et al., 2025): the reward is the **self-certainty** of the model, the distance of its next-token distributions from the uniform one.
+- **TTRL** ([Zuo et al., 2025](https://www.alphaxiv.org/abs/2504.16084)): sample a group, take the **majority answer** as the label, reward agreement with it.
+- **INTUITOR** ([Zhao et al., 2025](https://www.alphaxiv.org/abs/2505.19590)): the reward is the **self-certainty** of the model, the distance of its next-token distributions from the uniform one.
 
 . . .
 
-- **Spurious rewards** (Shao et al., 2025): on Qwen2.5-Math-7B, even **random** rewards raised MATH-500 by 21 points (29 with the true reward). Not on Llama or OLMo.
+- **Spurious rewards** ([Shao et al., 2025](https://www.alphaxiv.org/abs/2506.10947)): on Qwen2.5-Math-7B, even **random** rewards raised MATH-500 by 21 points (29 with the true reward). Not on Llama or OLMo.
 
 ::: lecture
 These rewards push the model towards its own most frequent or most confident answers: they sharpen the distribution, like RL with a true reward, but without any information about which answers are right. They help when the mode of the model is already right more often than not, and they reinforce its mistakes otherwise; over long runs, they can collapse to answers that are confidently wrong. The result on random rewards shows that part of the gains of RLVR on some models come from the optimisation itself, here from the clipping of GRPO amplifying behaviours that the model already had, such as reasoning in code. The lesson for experiments is practical: a new RL method must be tested on several model families, and compared with weak baselines, before its gains are attributed to the reward.
@@ -2145,7 +2253,7 @@ These rewards push the model towards its own most frequent or most confident ans
 On-policy distillation keeps the best of both: the model learns on its own answers, and gets feedback **at every token**.
 
 ::: lecture
-RL gives a few bits of information per episode, a single reward for an answer of thousands of tokens, but on the right distribution: the answers of the model itself. SFT and distillation give a target at every token, but on answers written by someone else (Section 2). The missing cell of the table is a teacher that grades every token of the student's own answer. The framing comes from a blog post of Thinking Machines (Lu et al., 2025); the method itself is older.
+RL gives a few bits of information per episode, a single reward for an answer of thousands of tokens, but on the right distribution: the answers of the model itself. SFT and distillation give a target at every token, but on answers written by someone else (Section 2). The missing cell of the table is a teacher that grades every token of the student's own answer. The framing comes from a blog post of Thinking Machines ([Lu et al., 2025](https://thinkingmachines.ai/blog/on-policy-distillation/)); the method itself is older.
 :::
 
 ## On-policy distillation
@@ -2159,7 +2267,7 @@ Minimising $-\sum_t r_t$ on the student's samples is minimising the **reverse KL
 
 . . .
 
-- GKD (Agarwal et al., 2024), MiniLLM (Gu et al., 2024); Qwen3 (2025) trains its small models this way.
+- GKD ([Agarwal et al., 2024](https://www.alphaxiv.org/abs/2306.13649)), MiniLLM ([Gu et al., 2024](https://www.alphaxiv.org/abs/2306.08543)); [Qwen3](https://www.alphaxiv.org/abs/2505.09388) (2025) trains its small models this way.
 - Qwen3-8B: 74.4 on AIME 2024 with on-policy distillation, against 67.6 with RL, for **a tenth of the GPU hours**.
 
 ::: lecture
@@ -2169,20 +2277,20 @@ The per-token reward is the log-ratio between the teacher and the student on the
 ## Self-distillation: the model is its own teacher
 <!-- type: content -->
 
-No stronger model? The teacher is **the model itself, with information that the student does not see**.
+In the absence of a stronger model, the teacher is **the model itself, with information that the student does not see**.
 
 | Method | The teacher also sees | Replaces |
 |---|---|---|
-| OPSD (Zhao et al., 2026) | a reference solution | RLVR |
-| SDFT (Shenfeld et al., 2026) | a demonstration | SFT |
-| SDPO (Hübotter et al., 2026) | feedback: an error message, a judge's critique | RLVR |
+| OPSD ([Zhao et al., 2026](https://www.alphaxiv.org/abs/2601.18734)) | a reference solution | RLVR |
+| SDFT ([Shenfeld et al., 2026](https://www.alphaxiv.org/abs/2601.19897)) | a demonstration | SFT |
+| SDPO ([Hübotter et al., 2026](https://www.alphaxiv.org/abs/2601.20802)) | feedback: an error message, a judge's critique | RLVR |
 
 . . .
 
 A model often **reads** a solution better than it **finds** one: in-context learning turns the extra information into a per-token signal.
 
 ::: lecture
-The idea goes back to *context distillation* (Askell et al., 2021; Snell et al., 2022): a model given a long instruction behaves better, and fine-tuning it to reproduce this behaviour without the instruction moves the instruction into the weights. STaR's rationalisation (Section 2) is an early form with a hint. The 2026 methods make it on-policy: the student answers without the extra information, and the same model, given the information, grades the student's tokens. A model given the correct answer of a problem judges each step of an attempt much better than a reward that only says, at the end, that the attempt failed. A survey of on-policy distillation (2026) counts self-distillation as its largest and fastest-growing family.
+The idea goes back to *context distillation* ([Askell et al., 2021](https://www.alphaxiv.org/abs/2112.00861); [Snell et al., 2022](https://www.alphaxiv.org/abs/2209.15189)): a model given a long instruction behaves better, and fine-tuning it to reproduce this behaviour without the instruction moves the instruction into the weights. STaR's rationalisation (Section 2) is an early form with a hint. The 2026 methods make it on-policy: the student answers without the extra information, and the same model, given the information, grades the student's tokens. A model given the correct answer of a problem judges each step of an attempt much better than a reward that only says, at the end, that the attempt failed. [A survey of on-policy distillation](https://www.alphaxiv.org/abs/2604.00626) (2026) counts self-distillation as its largest and fastest-growing family.
 :::
 
 ## OPSD: on-policy self-distillation
@@ -2200,20 +2308,20 @@ $$\frac{1}{|\hat y|} \sum_n D\Big(\pi_{\text{ref}}(\cdot \mid x, y^\star, \hat y
 Qwen3-1.7B on AIME and HMMT: 37.1 → **43.4** with OPSD, 37.7 with GRPO, with 1 answer of 1,000 tokens per problem instead of 8 of 16,000.
 
 ::: lecture
-The paper is Zhao et al. (2026). The divergence is computed over the whole vocabulary at each position; in their ablation, the forward KL from the teacher to the student worked best, and the reverse KL and the Jensen-Shannon divergence less well. Two details matter. The teacher is frozen at the initial model, so that it cannot drift with the student. And the per-token terms are clipped: otherwise tokens of style, on which the student and the teacher disagree for reasons unrelated to the solution, dominate the loss and training can collapse. The gains over GRPO shrink with the size of the model (64.8 against 64.0 at 8B), and the method needs a model that understands the reference solution: on problems beyond its reach, the teacher has nothing to teach. The lab reproduces the method on additions, and meets the problem of style.
+The paper is [Zhao et al. (2026)](https://www.alphaxiv.org/abs/2601.18734). The divergence is computed over the whole vocabulary at each position; in their ablation, the forward KL from the teacher to the student worked best, and the reverse KL and the Jensen-Shannon divergence less well. Two details matter. The teacher is frozen at the initial model, so that it cannot drift with the student. And the per-token terms are clipped: otherwise tokens of style, on which the student and the teacher disagree for reasons unrelated to the solution, dominate the loss and training can collapse. The gains over GRPO shrink with the size of the model (64.8 against 64.0 at 8B), and the method needs a model that understands the reference solution: on problems beyond its reach, the teacher has nothing to teach. The lab reproduces the method on additions, and meets the problem of style.
 :::
 
 ## SDFT and SDPO
 <!-- type: content -->
 
-**SDFT** (Shenfeld et al., 2026): learn from demonstrations **on-policy**. The teacher is the model with a demonstration in its context.
+**SDFT** ([Shenfeld et al., 2026](https://www.alphaxiv.org/abs/2601.19897)): learn from demonstrations **on-policy**. The teacher is the model with a demonstration in its context.
 
 - Learns new skills and new facts like SFT, with **much less forgetting** of the old ones.
 - A step towards continual learning; works better with larger models.
 
 . . .
 
-**SDPO** (Hübotter et al., 2026): RL with **rich feedback**. The teacher is the model that has read the error message of its own failed attempt.
+**SDPO** ([Hübotter et al., 2026](https://www.alphaxiv.org/abs/2601.20802)): RL with **rich feedback**. The teacher is the model that has read the error message of its own failed attempt.
 
 - When there is no feedback, a successful attempt of the group serves as the teacher's context for the failed ones.
 - Higher accuracy than GRPO, with much shorter answers.
@@ -2383,7 +2491,7 @@ Trainable parameters: $2dr$ instead of $d^2$.
 After training, the adapter can be **merged** back into the base weights ($W \leftarrow W + \Delta W$) at zero inference cost, or kept separate for easy swapping.
 
 ::: lecture
-LoRA was introduced by Hu et al. (2021). The bet is that the update needed to adapt a pre-trained model has a low intrinsic rank, even if the weights themselves do not. With $d = 4096$ and $r = 8$, an adapter has $65{,}536$ parameters where the full matrix has about 16.8 million, a ratio of 256. The matrix $B$ is initialised at zero, so that $\Delta W = 0$ at the start and training starts exactly from the pre-trained model; the update is scaled by $\alpha / r$, which keeps the same learning rate meaningful across ranks.
+LoRA was introduced by [Hu et al. (2021)](https://www.alphaxiv.org/abs/2106.09685). The bet is that the update needed to adapt a pre-trained model has a low intrinsic rank, even if the weights themselves do not. With $d = 4096$ and $r = 8$, an adapter has $65{,}536$ parameters where the full matrix has about 16.8 million, a ratio of 256. The matrix $B$ is initialised at zero, so that $\Delta W = 0$ at the start and training starts exactly from the pre-trained model; the update is scaled by $\alpha / r$, which keeps the same learning rate meaningful across ranks.
 :::
 
 ## LoRA implementation
@@ -2478,21 +2586,21 @@ Why can a low-rank update adapt a model of several billion parameters? In LoRA, 
 You double the rank and the results do not change. What does this tell you, and what would you tune instead?
 
 ::: answer
-**Why a low rank is enough.** Fine-tuning moves a pre-trained model a short distance, along few directions. Aghajanyan et al. (2021) measured the *intrinsic dimension* of fine-tuning: optimising the parameters within a random subspace of a few hundred to a few thousand dimensions recovers 90% of the performance of full fine-tuning on their classification tasks, and the intrinsic dimension decreases as the pre-trained model gets larger. Post-training mostly changes the behaviour of the model rather than its knowledge (the superficial alignment hypothesis of Section 2), and such changes have a low-rank structure. The counterpoint is on a slide below: when the target requires a lot of new knowledge, the updates of full fine-tuning have a much higher rank, and LoRA learns less.
+**Why a low rank is enough.** Fine-tuning moves a pre-trained model a short distance, along few directions. [Aghajanyan et al. (2021)](https://www.alphaxiv.org/abs/2012.13255) measured the *intrinsic dimension* of fine-tuning: optimising the parameters within a random subspace of a few hundred to a few thousand dimensions recovers 90% of the performance of full fine-tuning on their classification tasks, and the intrinsic dimension decreases as the pre-trained model gets larger. Post-training mostly changes the behaviour of the model rather than its knowledge (the superficial alignment hypothesis of Section 2), and such changes have a low-rank structure. The counterpoint is on a slide below: when the target requires a lot of new knowledge, the updates of full fine-tuning have a much higher rank, and LoRA learns less.
 
-**The rank.** $r$ bounds the rank of the update of each matrix and sets the number of trainable parameters, $r(d_{\text{in}} + d_{\text{out}})$ per matrix. For Llama 2 7B, with adapters on all the linear layers (per layer, 4 attention matrices of size $4{,}096 \times 4{,}096$ and 3 MLP matrices of size $4{,}096 \times 11{,}008$, over 32 layers) and $r = 16$, this is about 40 million parameters, 0.6% of the model. Hu et al. (2021) found that very small ranks, down to 1, already gave most of the gain in their experiments on GPT-3.
+**The rank.** $r$ bounds the rank of the update of each matrix and sets the number of trainable parameters, $r(d_{\text{in}} + d_{\text{out}})$ per matrix. For Llama 2 7B, with adapters on all the linear layers (per layer, 4 attention matrices of size $4{,}096 \times 4{,}096$ and 3 MLP matrices of size $4{,}096 \times 11{,}008$, over 32 layers) and $r = 16$, this is about 40 million parameters, 0.6% of the model. [Hu et al. (2021)](https://www.alphaxiv.org/abs/2106.09685) found that very small ranks, down to 1, already gave most of the gain in their experiments on GPT-3.
 
 **The initialisation.** With $B = 0$ and $A$ random, $\Delta W = 0$ at the start, so training starts exactly from the pre-trained model. The two factors cannot both be zero: the gradient of $B$ is proportional to $A x$ and that of $A$ to $B^\top$, so with $A = B = 0$ both gradients vanish and training never starts. One random factor is enough to break this symmetry.
 
-**The scaling.** The update is $\frac{\alpha}{r} BA$. With Adam, the size of a step on each entry is set by the learning rate rather than by the size of the gradient, so the factor $\alpha / r$ acts as a learning-rate multiplier for the adapter. The division by $r$ was meant to spare retuning the learning rate when the rank changes, and Hu et al. simply set $\alpha$ to the first rank they tried; a common convention today is $\alpha = 2r$. Kalajdzievski (2023) argued that the factor $1/r$ shrinks the updates too much at high ranks, so that larger ranks learn more slowly rather than better, and proposed the factor $\alpha / \sqrt r$ (rsLoRA).
+**The scaling.** The update is $\frac{\alpha}{r} BA$. With Adam, the size of a step on each entry is set by the learning rate rather than by the size of the gradient, so the factor $\alpha / r$ acts as a learning-rate multiplier for the adapter. The division by $r$ was meant to spare retuning the learning rate when the rank changes, and Hu et al. simply set $\alpha$ to the first rank they tried; a common convention today is $\alpha = 2r$. [Kalajdzievski (2023)](https://www.alphaxiv.org/abs/2312.03732) argued that the factor $1/r$ shrinks the updates too much at high ranks, so that larger ranks learn more slowly rather than better, and proposed the factor $\alpha / \sqrt r$ (rsLoRA).
 
 **Doubling the rank changes nothing.** This is the usual outcome, and it says that the rank was not the bottleneck: the task needs only a low-rank update, or the limit is elsewhere. With a fixed $\alpha$, doubling $r$ also halves the effective step, which can hide the effect of the extra capacity. The hyperparameters that matter more are:
 
 - the **learning rate**, typically about ten times larger for LoRA than for full fine-tuning;
-- the **target matrices**: adapting all the linear layers, the MLP included, works better than adapting $W_Q$ and $W_V$ only (Dettmers et al., 2023);
-- refinements of the parametrisation, such as different learning rates for $A$ and $B$ (LoRA+, Hayou et al., 2024) or a separate magnitude for each column of the weight matrix (DoRA, Liu et al., 2024).
+- the **target matrices**: adapting all the linear layers, the MLP included, works better than adapting $W_Q$ and $W_V$ only ([Dettmers et al., 2023](https://www.alphaxiv.org/abs/2305.14314));
+- refinements of the parametrisation, such as different learning rates for $A$ and $B$ (LoRA+, [Hayou et al., 2024](https://www.alphaxiv.org/abs/2402.12354)) or a separate magnitude for each column of the weight matrix (DoRA, [Liu et al., 2024](https://www.alphaxiv.org/abs/2402.09353)).
 
-**Going further.** The capacity needed depends on how much information the training signal carries. SFT on a large corpus carries many bits per example, and LoRA falls behind full fine-tuning; reinforcement learning with a scalar reward carries at most a few bits per episode, and LoRA with a very small rank has been reported to match full fine-tuning in RL (Schulman et al., 2025, *LoRA Without Regret*). On the systems side, small adapters make it possible to serve many fine-tuned variants of one base model on the same GPUs, batching requests that use different adapters (S-LoRA, Sheng et al., 2023). The memory budget of LoRA and QLoRA is the subject of the last interview question of Part 1.
+**Going further.** The capacity needed depends on how much information the training signal carries. SFT on a large corpus carries many bits per example, and LoRA falls behind full fine-tuning; reinforcement learning with a scalar reward carries at most a few bits per episode, and LoRA with a very small rank has been reported to match full fine-tuning in RL ([Schulman et al., 2025](https://thinkingmachines.ai/blog/lora/), *LoRA Without Regret*). On the systems side, small adapters make it possible to serve many fine-tuned variants of one base model on the same GPUs, batching requests that use different adapters (S-LoRA, [Sheng et al., 2023](https://www.alphaxiv.org/abs/2311.03285)). The memory budget of LoRA and QLoRA is the subject of the last interview question of Part 1.
 :::
 
 ## QLoRA: quantized LoRA
@@ -2513,18 +2621,42 @@ This allows fine-tuning a **65B model on a single 48 GB GPU**.
 | QLoRA (4-bit + rank 16) | ~0.1% | ~40 GB | Close to LoRA |
 
 ::: lecture
-QLoRA was introduced by Dettmers et al. (2023). The frozen weights are stored in 4 bits and converted back to 16 bits on the fly for each matrix product; gradients flow through them to the adapters, which stay in 16 bits. NF4 (4-bit NormalFloat) places its 16 levels at the quantiles of a normal distribution, which matches the distribution of trained weights. The memory figures of the table are orders of magnitude: with LoRA, most of the memory goes to the frozen weights, about 140 GB in 16 bits and 35 GB in 4 bits for a 70B model.
+QLoRA was introduced by [Dettmers et al. (2023)](https://www.alphaxiv.org/abs/2305.14314). The frozen weights are stored in 4 bits and converted back to 16 bits on the fly for each matrix product; gradients flow through them to the adapters, which stay in 16 bits. NF4 (4-bit NormalFloat) places its 16 levels at the quantiles of a normal distribution, which matches the distribution of trained weights. The memory figures of the table are orders of magnitude: with LoRA, most of the memory goes to the frozen weights, about 140 GB in 16 bits and 35 GB in 4 bits for a 70B model.
 :::
 
-## LoRA learns less and forgets less
+## In SFT, LoRA learns less and forgets less
 <!-- type: content -->
 
-- On hard targets (code, math with lots of data), full fine-tuning learns more than LoRA (Biderman et al., 2024).
+- On hard targets (code, math with lots of data), full fine-tuning learns more than LoRA ([Biderman et al., 2024](https://www.alphaxiv.org/abs/2405.09673)).
 - But LoRA **forgets less** of the base model's abilities: the low-rank update is a strong regularizer.
 - Adapters are small files (a few MB): one base model can serve many adapters, swapped per request.
 
 ::: lecture
-The study of Biderman et al. (2024) also measured the rank of the updates learned by full fine-tuning on these targets, and found it 10 to 100 times higher than the ranks typically used with LoRA. For the light adaptations of post-training, such as a format, a tone or a narrow task, LoRA is usually enough; for teaching a new domain from a large corpus, it is not.
+The study of [Biderman et al. (2024)](https://www.alphaxiv.org/abs/2405.09673) also measured the rank of the updates learned by full fine-tuning on these targets, and found it 10 to 100 times higher than the ranks typically used with LoRA. For the light adaptations of post-training, such as a format, a tone or a narrow task, LoRA is usually enough; for teaching a new domain from a large corpus, it is not.
+:::
+
+## LoRA in RL
+<!-- type: content -->
+
+An RL answer carries a few bits (one reward), an SFT answer a few bits per token: RL needs far less capacity.
+
+- Rank-1 LoRA matches full fine-tuning in RL on math ([Schulman et al., 2025](https://thinkingmachines.ai/blog/lora/), Llama-3.1-8B and Qwen3-8B).
+- TinyLoRA: **13 parameters** trained with RL bring Qwen2.5 to 91% on GSM8K; SFT needs updates 100 to 1000 times larger ([Morris et al., 2026](https://www.alphaxiv.org/abs/2602.04118)).
+
+. . .
+
+- The reference model comes for free: $\pi_{\text{ref}}$ is the base model with the adapter switched off.
+
+. . .
+
+The variant matters. On R1-Distill-Qwen-1.5B, at 40.5 before RL: DoRA 46.6, full 44.9, LoRA 42.5, rank-1 LoRA 40.5, PiSSA 0.2 ([Yin et al., 2025](https://www.alphaxiv.org/abs/2512.23165)).
+
+::: lecture
+The argument of [Schulman et al.](https://thinkingmachines.ai/blog/lora/) (2025, *LoRA Without Regret*, Thinking Machines) is information-theoretic. Policy-gradient learning is driven by the advantage, about one number per answer, so training on 10,000 MATH problems with 32 answers each gives at most about 320,000 bits, while a rank-1 adapter of Llama-3.1-8B already has 3 million parameters. The same study gives practical rules that hold for SFT and RL: apply LoRA to all the layers, the MLP included, since attention-only LoRA underperforms; use a learning rate about 10 times larger than for full fine-tuning; and avoid very large batches, which hurt LoRA more than full fine-tuning. In SFT, LoRA matches full fine-tuning as long as the dataset fits in the capacity of the adapter, which is the regime of the previous slide.
+
+The free reference matters for memory: RLHF and GRPO need the policy and the reference, and DPO needs the reference too. With a full fine-tuning, these are two copies of the model; with LoRA, the reference is the same weights with the adapter disabled, which is what TRL does for its GRPO and DPO trainers. The same property makes LoRA attractive for training services: the Tinker API of Thinking Machines trains only LoRA adapters, so that many runs, RL included, share the same base model on the same GPUs.
+
+The comparison of [Yin et al. (2025)](https://www.alphaxiv.org/abs/2512.23165) trains DeepSeek-R1-Distill-Qwen-1.5B with DAPO and LoRA of rank 32, averaged over six math benchmarks. The model scores 40.5 before training. DoRA, which learns a separate magnitude for each column, beats full fine-tuning; plain LoRA keeps about half of the gain of full fine-tuning; and the rank-1 LoRA stays at 40.5: in this setting, a distilled reasoning model on competition math, it learns nothing, contrary to the results of Schulman et al. The real failures are PiSSA and MiLoRA (18.0), which initialise the adapter from the singular value decomposition of the weights, along the top or the bottom singular directions; such initialisations help SFT. [Zhu et al. (2025)](https://www.alphaxiv.org/abs/2511.08567) explain why they hurt RL: the updates of RLVR avoid the principal directions of the weights and preserve their spectrum, while SFT modifies them. LoRA is therefore at least as natural for RL as for SFT, but the variants designed for SFT do not carry over.
 :::
 
 ::: {.lecture .notebook}
@@ -2667,7 +2799,7 @@ How do we know that an assistant got better?
 - **Human preference**: pairwise votes between anonymous models (LMArena, formerly Chatbot Arena).
 
 ::: lecture
-Each approach measures something different. Benchmarks with a known answer are cheap and reproducible, but they measure narrow skills and say little about how helpful an answer is. A judge model can grade open-ended answers, but it has its own biases: Zheng et al. (2023), who introduced MT-Bench and Chatbot Arena, found that judges favour longer answers, the answer shown first, and answers written in their own style. Human votes are the closest to what users want, but they are slow, noisy and sensitive to style.
+Each approach measures something different. Benchmarks with a known answer are cheap and reproducible, but they measure narrow skills and say little about how helpful an answer is. A judge model can grade open-ended answers, but it has its own biases: [Zheng et al. (2023)](https://www.alphaxiv.org/abs/2306.05685), who introduced MT-Bench and Chatbot Arena, found that judges favour longer answers, the answer shown first, and answers written in their own style. Human votes are the closest to what users want, but they are slow, noisy and sensitive to style.
 :::
 
 ## Arena scores are Bradley-Terry
@@ -2698,15 +2830,15 @@ What would you check about the judge before trusting the result?
 ::: answer
 **The statistics first.** The win rate is 53%. If the two models were equally good, the number of wins would be binomial with $p = 0.5$, and the standard error of the win rate is $\sqrt{0.25/500} \approx 2.2$ points: 53% is 1.34 standard errors above 50%, a two-sided $p$-value of about 0.18. The 95% confidence interval of the win rate is about $[48.6\%, 57.4\%]$, so the data are compatible with a slightly worse model. For a win rate of 53% to be significant at this level, the half-width $1.96 \times 0.5/\sqrt n$ must fall below 3 points, which requires about 1,070 comparisons; to detect such a difference reliably, with a power of 80%, about 2,200 are needed. On the Elo scale of the arena, 53% corresponds to $400 \log_{10}(0.53/0.47) \approx 21$ points: small differences need many votes, as the lab below shows. Ties must also be handled by a rule fixed in advance (half a win each, or excluded), since a judge that often answers "tie" changes the win rate.
 
-**The biases of the judge.** Zheng et al. (2023) documented three biases of LLM judges, each of which can produce a 53% on its own:
+**The biases of the judge.** [Zheng et al. (2023)](https://www.alphaxiv.org/abs/2306.05685) documented three biases of LLM judges, each of which can produce a 53% on its own:
 
 - **Position bias**: judges favour the answer shown in a given position, often the first one. Run each comparison in both orders, and count a win only when the two verdicts agree, or average them.
-- **Verbosity bias**: judges, like humans, prefer longer answers. Compare the lengths of the answers of the two models; the length-controlled win rate of AlpacaEval (Dubois et al., 2024) regresses the verdicts on the difference of lengths and reports the win rate at equal length.
+- **Verbosity bias**: judges, like humans, prefer longer answers. Compare the lengths of the answers of the two models; the length-controlled win rate of AlpacaEval ([Dubois et al., 2024](https://www.alphaxiv.org/abs/2404.04475)) regresses the verdicts on the difference of lengths and reports the win rate at equal length.
 - **Self-enhancement bias**: a judge tends to prefer answers in its own style, which is a serious problem when the new checkpoint was trained on data generated by the judge.
 
 Before relying on a judge, measure its agreement with human raters on a sample of the comparisons. Zheng et al. found that a strong judge agreed with humans over 80% of the time, about as often as humans agreed with each other, but this must be checked on one's own prompts.
 
-**The prompts.** The 500 prompts must represent the actual use of the model, and an average can hide a regression on a category that matters, such as refusals, code or a given language: report the win rate per category. Run the automatic benchmarks of capabilities as well, since post-training can lose abilities of the base model, the "alignment tax" of InstructGPT (Ouyang et al., 2022), and a judge comparing chat answers will not see a drop in mathematical accuracy unless the prompts test it.
+**The prompts.** The 500 prompts must represent the actual use of the model, and an average can hide a regression on a category that matters, such as refusals, code or a given language: report the win rate per category. Run the automatic benchmarks of capabilities as well, since post-training can lose abilities of the base model, the "alignment tax" of InstructGPT ([Ouyang et al., 2022](https://www.alphaxiv.org/abs/2203.02155)), and a judge comparing chat answers will not see a drop in mathematical accuracy unless the prompts test it.
 
 **Going further.** The randomness that matters is the choice of the prompts, so the confidence interval should come from a bootstrap over prompts, especially when several answers per prompt are judged. The final word belongs to an online A/B test with real users, on metrics defined before the test; offline evaluation with a judge is a filter that decides which checkpoints deserve one. Finally, if the same judge was used as a reward during training, the policy has been optimised against it, and the judge can no longer serve as an independent evaluator: this is reward hacking again (Section 4).
 :::
